@@ -1,0 +1,38 @@
+generator client {
+    provider = "prisma-client"
+    output   = "../src/generated/prisma"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+enum QueueStatus {
+    WAITING
+    SERVING
+    COMPLETED
+}
+
+model ServiceCenter {
+    id   String @id @default(uuid())
+    name String
+
+    queues Queue[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Queue {
+    id              String      @id @default(uuid())
+    tokenNumber     Int
+    customerName    String
+
+    status          QueueStatus @default(WAITING)
+    
+    serviceCenterId String
+    serviceCenter ServiceCenter @relation(fields: [serviceCenterId], references: [id])
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
