@@ -8,6 +8,7 @@ import {
     getQueuePosition,
     getDisplayData,
     getQueueStats,
+    resetQueue,
 } from "../services/queue.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -104,6 +105,20 @@ const queueStats = asyncHandler(async (req, res) => {
         );
 });
 
+const resetQueueController = asyncHandler(async(req,res)=>{
+    const {serviceCenterId}=req.params;
+
+    await resetQueue(serviceCenterId);
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            null,
+            "Queue reset successfully"
+        )
+    )
+})
+
 export {
     addCustomer,
     getAllQueue,
@@ -112,5 +127,6 @@ export {
     currentToken,
     queuePosition,
     displayQueue,
-    queueStats
+    queueStats,
+    resetQueueController,
 };

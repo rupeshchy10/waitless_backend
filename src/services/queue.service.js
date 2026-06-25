@@ -2,6 +2,24 @@ import { prisma } from "../utils/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
 
 const createQueueEntry = async (customerName, serviceCenterId) => {
+    if (!customerName?.trim()) {
+        throw new ApiError(400, "Customer name is required");
+    }
+
+    if (!serviceCenterId) {
+        throw new ApiError(400, "Service center id is required");
+    }
+
+    const serviceCenter = await prisma.serviceCenter.findUnique({
+        where: {
+            id: serviceCenterId,
+        },
+    });
+
+    if (!serviceCenter) {
+        throw new ApiError(404, "Service center not found");
+    }
+
     const lastToken = await prisma.queue.findFirst({
         where: {
             serviceCenterId,
@@ -15,7 +33,7 @@ const createQueueEntry = async (customerName, serviceCenterId) => {
 
     const queueEntry = await prisma.queue.create({
         data: {
-            customerName,
+            customerName: customerName.trim(),
             tokenNumber: nextToken,
             serviceCenterId,
         },
@@ -36,6 +54,27 @@ const getQueue = async (serviceCenterId) => {
 };
 
 const callNextCustomer = async (serviceCenterId) => {
+    const currentServing = await prisma.queue.findFirst({
+        where: {
+            serviceCenterId,
+            status: "SERVING",
+        },
+        orderBy: {
+            tokenNumber: "asc",
+        },
+    });
+
+    if (currentServing) {
+        await prisma.queue.update({
+            where: {
+                id: currentServing.id,
+            },
+            data: {
+                status: "COMPLETED",
+            },
+        });
+    }
+
     const waitingCustomer = await prisma.queue.findFirst({
         where: {
             serviceCenterId,
@@ -47,7 +86,7 @@ const callNextCustomer = async (serviceCenterId) => {
     });
 
     if (!waitingCustomer) {
-        throw new ApiError(400, "No customer waiting in queue");
+        throw new ApiError(404, "No customer waiting in queue");
     }
 
     const updatedCustomer = await prisma.queue.update({
@@ -230,6 +269,26 @@ const getQueueStats = async (serviceCenterId) => {
     };
 };
 
+const resetQueue = async (serviceCenterId) => {
+    const serviceCenter = await prisma.serviceCenter.findUnique({
+        where: {
+            id: serviceCenterId,
+        },
+    });
+
+    if (!serviceCenter) {
+        throw new ApiError(404, "Service center not found");
+    }
+
+    await prisma.queue.deleteMany({
+        where: {
+            serviceCenterId,
+        },
+    });
+
+    return null;
+};
+
 export {
     createQueueEntry,
     getQueue,
@@ -238,5 +297,6 @@ export {
     getCurrentToken,
     getQueuePosition,
     getDisplayData,
-    getQueueStats
+    getQueueStats,
+    resetQueue
 };

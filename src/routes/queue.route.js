@@ -9,15 +9,10 @@ import {
     queuePosition,
     displayQueue,
     queueStats,
+    resetQueueController,
 } from "../controllers/queue.controller.js";
 
 const router = Router();
-
-router.get("/test", (req, res) => {
-    res.json({
-        message: "Queue API Working",
-    });
-});
 
 router.post("/", addCustomer);
 router.get("/:serviceCenterId", getAllQueue);
@@ -27,5 +22,7 @@ router.get("/current-token/:serviceCenterId", currentToken);
 router.get("/position/:serviceCenterId/:queueId", queuePosition);
 router.get("/display/:serviceCenterId", displayQueue);
 router.get("/stats/:serviceCenterId", queueStats);
+
+router.delete("/reset/:serviceCenterId", resetQueueController);
 
 export default router;
