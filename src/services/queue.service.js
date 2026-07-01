@@ -1,7 +1,7 @@
 import { prisma } from "../utils/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
 
-const createQueueEntry = async (customerName, serviceCenterId) => {
+const createQueueEntryService = async (customerName, serviceCenterId) => {
     if (!customerName?.trim()) {
         throw new ApiError(400, "Customer name is required");
     }
@@ -42,7 +42,7 @@ const createQueueEntry = async (customerName, serviceCenterId) => {
     return queueEntry;
 };
 
-const getQueue = async (serviceCenterId) => {
+const getAllQueueService = async (serviceCenterId) => {
     return await prisma.queue.findMany({
         where: {
             serviceCenterId,
@@ -53,7 +53,7 @@ const getQueue = async (serviceCenterId) => {
     });
 };
 
-const callNextCustomer = async (serviceCenterId) => {
+const callNextCustomerService = async (serviceCenterId) => {
     const currentServing = await prisma.queue.findFirst({
         where: {
             serviceCenterId,
@@ -101,7 +101,7 @@ const callNextCustomer = async (serviceCenterId) => {
     return updatedCustomer;
 };
 
-const completeCustomer = async (queueId) => {
+const completeCustomerService = async (queueId) => {
     const queue = await prisma.queue.findUnique({
         where: {
             id: queueId,
@@ -122,7 +122,7 @@ const completeCustomer = async (queueId) => {
     });
 };
 
-const getCurrentToken = async (serviceCenterId) => {
+const getCurrentTokenService = async (serviceCenterId) => {
     const currentCustomer = await prisma.queue.findFirst({
         where: {
             serviceCenterId,
@@ -144,7 +144,7 @@ const getCurrentToken = async (serviceCenterId) => {
     };
 };
 
-const getQueuePosition = async (serviceCenterId, queueId) => {
+const getQueuePositionService = async (serviceCenterId, queueId) => {
     const customer = await prisma.queue.findUnique({
         where: {
             id: queueId,
@@ -202,7 +202,7 @@ const getQueuePosition = async (serviceCenterId, queueId) => {
     };
 };
 
-const getDisplayData = async (serviceCenterId) => {
+const getDisplayQueueDataService = async (serviceCenterId) => {
     const nowServing = await prisma.queue.findFirst({
         where: {
             serviceCenterId,
@@ -239,7 +239,7 @@ const getDisplayData = async (serviceCenterId) => {
     };
 };
 
-const getQueueStats = async (serviceCenterId) => {
+const getQueueStatsService = async (serviceCenterId) => {
     const waiting = await prisma.queue.count({
         where: {
             serviceCenterId,
@@ -269,7 +269,7 @@ const getQueueStats = async (serviceCenterId) => {
     };
 };
 
-const resetQueue = async (serviceCenterId) => {
+const resetQueueService = async (serviceCenterId) => {
     const serviceCenter = await prisma.serviceCenter.findUnique({
         where: {
             id: serviceCenterId,
@@ -290,13 +290,13 @@ const resetQueue = async (serviceCenterId) => {
 };
 
 export {
-    createQueueEntry,
-    getQueue,
-    callNextCustomer,
-    completeCustomer,
-    getCurrentToken,
-    getQueuePosition,
-    getDisplayData,
-    getQueueStats,
-    resetQueue
+    createQueueEntryService,
+    getAllQueueService,
+    callNextCustomerService,
+    completeCustomerService,
+    getCurrentTokenService,
+    getQueuePositionService,
+    getDisplayQueueDataService,
+    getQueueStatsService,
+    resetQueueService
 };

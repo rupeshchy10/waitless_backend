@@ -1,28 +1,27 @@
 import { Router } from "express";
 
 import {
-    addCustomer,
-    getAllQueue,
-    nextCustomer,
-    completedCurrentCustomer,
-    currentToken,
-    queuePosition,
-    displayQueue,
-    queueStats,
+  createQueueEntryController,
+    getAllQueueController,
+    callNextCustomerController,
+    completeCustomerController,
+    getCurrentTokenController,
+    getQueuePositionController,
+    getDisplayQueueDataController,
+    getQueueStatsController,
     resetQueueController,
 } from "../controllers/queue.controller.js";
 
 const router = Router();
 
-router.post("/", addCustomer);
-router.get("/:serviceCenterId", getAllQueue);
-router.patch("/next", nextCustomer);
-router.patch("/:queueId/complete", completedCurrentCustomer);
-router.get("/current-token/:serviceCenterId", currentToken);
-router.get("/position/:serviceCenterId/:queueId", queuePosition);
-router.get("/display/:serviceCenterId", displayQueue);
-router.get("/stats/:serviceCenterId", queueStats);
-
+router.post("/", createQueueEntryController);
+router.get("/:serviceCenterId", getAllQueueController);
+router.patch("/next", callNextCustomerController);
+router.patch("/:queueId/complete", completeCustomerController);
+router.get("/current-token/:serviceCenterId", getCurrentTokenController);
+router.get("/position/:serviceCenterId/:queueId", getQueuePositionController);
+router.get("/display/:serviceCenterId", getDisplayQueueDataController);
+router.get("/stats/:serviceCenterId", getQueueStatsController);
 router.delete("/reset/:serviceCenterId", resetQueueController);
 
 export default router;

@@ -13,6 +13,26 @@ enum QueueStatus {
     COMPLETED
 }
 
+enum Role {
+    ADMIN
+    STAFF
+    USER
+}
+
+model User {
+    id           String  @id @default(uuid())
+    fullName     String
+    email        String  @unique
+    password     String
+    phoneNumber  String
+    address      String
+    profileImage String?
+    role         Role    @default(STAFF)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
 model ServiceCenter {
     id   String @id @default(uuid())
     name String
@@ -24,14 +44,14 @@ model ServiceCenter {
 }
 
 model Queue {
-    id              String      @id @default(uuid())
-    tokenNumber     Int
-    customerName    String
+    id           String @id @default(uuid())
+    tokenNumber  Int
+    customerName String
 
-    status          QueueStatus @default(WAITING)
-    
+    status QueueStatus @default(WAITING)
+
     serviceCenterId String
-    serviceCenter ServiceCenter @relation(fields: [serviceCenterId], references: [id])
+    serviceCenter   ServiceCenter @relation(fields: [serviceCenterId], references: [id])
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt

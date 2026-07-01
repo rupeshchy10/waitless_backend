@@ -1,82 +1,82 @@
 import { stat } from "node:fs";
 import {
-    createQueueEntry,
-    getQueue,
-    callNextCustomer,
-    completeCustomer,
-    getCurrentToken,
-    getQueuePosition,
-    getDisplayData,
-    getQueueStats,
-    resetQueue,
+    createQueueEntryService,
+    getAllQueueService,
+    callNextCustomerService,
+    completeCustomerService,
+    getCurrentTokenService,
+    getQueuePositionService,
+    getDisplayQueueDataService,
+    getQueueStatsService,
+    resetQueueService,
 } from "../services/queue.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
-const addCustomer = asyncHandler(async (req, res) => {
+const createQueueEntryController = asyncHandler(async (req, res) => {
     const { customerName, serviceCenterId } = req.body;
 
-    const queue = await createQueueEntry(customerName, serviceCenterId);
+    const queue = await createQueueEntryService(customerName, serviceCenterId);
 
     return res
         .status(201)
         .json(new ApiResponse(201, queue, "Customer added to queue"));
 });
 
-const getAllQueue = asyncHandler(async (req, res) => {
+const getAllQueueController = asyncHandler(async (req, res) => {
     const { serviceCenterId } = req.params;
 
-    const queues = await getQueue(serviceCenterId);
+    const queues = await getAllQueueService(serviceCenterId);
 
     return res
         .status(200)
         .json(new ApiResponse(200, queues, "Queue fetched successfully"));
 });
 
-const nextCustomer = asyncHandler(async (req, res) => {
+const callNextCustomerController = asyncHandler(async (req, res) => {
     const { serviceCenterId } = req.body;
 
-    const customer = await callNextCustomer(serviceCenterId);
+    const customer = await callNextCustomerService(serviceCenterId);
 
     return res
         .status(200)
         .json(new ApiResponse(200, customer, "Next customer called"));
 });
 
-const completedCurrentCustomer = asyncHandler(async (req, res) => {
+const completeCustomerController = asyncHandler(async (req, res) => {
     const { queueId } = req.params;
 
-    const customer = await completeCustomer(queueId);
+    const customer = await completeCustomerService(queueId);
 
     return res
         .status(200)
         .json(new ApiResponse(200, customer, "Customer completed"));
 });
 
-const currentToken = asyncHandler(async (req, res) => {
+const getCurrentTokenController = asyncHandler(async (req, res) => {
     const { serviceCenterId } = req.params;
 
-    const token = await getCurrentToken(serviceCenterId);
+    const token = await getCurrentTokenService(serviceCenterId);
 
     return res
         .status(200)
         .json(new ApiResponse(200, token, "Current token fetched"));
 });
 
-const queuePosition = asyncHandler(async (req, res) => {
+const getQueuePositionController = asyncHandler(async (req, res) => {
     const { serviceCenterId, queueId } = req.params;
 
-    const position = await getQueuePosition(serviceCenterId, queueId);
+    const position = await getQueuePositionService(serviceCenterId, queueId);
 
     return res
         .status(200)
         .json(new ApiResponse(200, position, "Queue position fetched"));
 });
 
-const displayQueue = asyncHandler(async (req, res) => {
+const getDisplayQueueDataController = asyncHandler(async (req, res) => {
     const { serviceCenterId } = req.params;
 
-    const displayData = await getDisplayData(serviceCenterId);
+    const displayData = await getDisplayQueueDataService(serviceCenterId);
 
     return res
         .status(200)
@@ -89,44 +89,36 @@ const displayQueue = asyncHandler(async (req, res) => {
         );
 });
 
-const queueStats = asyncHandler(async (req, res) => {
+const getQueueStatsController = asyncHandler(async (req, res) => {
     const { serviceCenterId } = req.params;
 
-    const stats = await getQueueStats(serviceCenterId);
+    const stats = await getQueueStatsService(serviceCenterId);
 
     return res
         .status(200)
         .json(
-            new ApiResponse(
-                200,
-                stats,
-                "Queue Stats displayed successfully"
-            )
+            new ApiResponse(200, stats, "Queue Stats displayed successfully")
         );
 });
 
-const resetQueueController = asyncHandler(async(req,res)=>{
-    const {serviceCenterId}=req.params;
+const resetQueueController = asyncHandler(async (req, res) => {
+    const { serviceCenterId } = req.params;
 
-    await resetQueue(serviceCenterId);
+    await resetQueueService(serviceCenterId);
 
-    return res.status(200).json(
-        new ApiResponse(
-            200,
-            null,
-            "Queue reset successfully"
-        )
-    )
-})
+    return res
+        .status(200)
+        .json(new ApiResponse(200, null, "Queue reset successfully"));
+});
 
 export {
-    addCustomer,
-    getAllQueue,
-    nextCustomer,
-    completedCurrentCustomer,
-    currentToken,
-    queuePosition,
-    displayQueue,
-    queueStats,
+    createQueueEntryController,
+    getAllQueueController,
+    callNextCustomerController,
+    completeCustomerController,
+    getCurrentTokenController,
+    getQueuePositionController,
+    getDisplayQueueDataController,
+    getQueueStatsController,
     resetQueueController,
 };
