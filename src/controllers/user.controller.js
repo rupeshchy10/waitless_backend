@@ -12,6 +12,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, users, "Users fetched successfully"));
 });
 
+// GET USER BY ID
 const getUserById = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -20,6 +21,17 @@ const getUserById = asyncHandler(async (req, res) => {
     return res
         .status(200)
         .json(new ApiResponse(200, user, "User fetched successfully"));
+});
+
+// GET OWN PROFILE
+const getOwnProfile = asyncHandler(async (req, res) => {
+    const { id } = req.user;
+
+    const user = await userService.getUserByIdService(id);
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, user, "Current user fetched successfully"));
 });
 
 // CREATE/REGISTER USER
@@ -86,13 +98,15 @@ const deleteUser = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, null, "User deleted successfully"));
 });
 
-// CURRENT USER
-const getCurrentUser = asyncHandler(async (req, res) => {
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(200, req.user, "Current user fetched successfully")
-        );
+// LOGOUT USER
+const logout = asyncHandler(async (req, res) => {
+    res.clearCookie("jwt", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+    });
+
+    res.status(200).json(new ApiResponse(200, null, "Logged out successfully"));
 });
 
 export {
@@ -100,7 +114,8 @@ export {
     getUserById,
     registerUser,
     loginUser,
+    getOwnProfile,
     updateUser,
     deleteUser,
-    getCurrentUser,
+    logout,
 };

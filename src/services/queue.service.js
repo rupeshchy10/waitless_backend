@@ -1,15 +1,13 @@
 import { prisma } from "../utils/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
 
-const createQueueEntryService = async (customerName, serviceCenterId) => {
-    if (!customerName?.trim()) {
-        throw new ApiError(400, "Customer name is required");
-    }
-
+const createQueueEntryService = async (userId, serviceCenterId) => {
+    // 1. VALIDATE INPUT
     if (!serviceCenterId) {
         throw new ApiError(400, "Service center id is required");
     }
 
+    // 2. CHECK IF SERVICE CENTER EXISTS
     const serviceCenter = await prisma.serviceCenter.findUnique({
         where: {
             id: serviceCenterId,
@@ -20,26 +18,60 @@ const createQueueEntryService = async (customerName, serviceCenterId) => {
         throw new ApiError(404, "Service center not found");
     }
 
-    const lastToken = await prisma.queue.findFirst({
+    // 3. CHECK IF USER ALREADY HAS AN ACTIVE QUEUE
+    const existingQueue = await prisma.queue.findFirst({
         where: {
+            userId,
             serviceCenterId,
-        },
-        orderBy: {
-            tokenNumber: "desc",
+            status: {
+                in: ["WAITING", "SERVING"],
+            },
         },
     });
 
-    const nextToken = lastToken ? lastToken.tokenNumber + 1 : 1;
+    if (existingQueue) {
+        throw new ApiError(
+            409,
+            "You already have an active queue ticket for this service center"
+        );
+    }
 
-    const queueEntry = await prisma.queue.create({
-        data: {
-            customerName: customerName.trim(),
-            tokenNumber: nextToken,
-            serviceCenterId,
-        },
+    // 4. CREATE QUEUE INSIDE A TRANSACTION
+    const queueEntry = await prisma.$transaction(async (tx) => {
+        // FIND LAST TOKEN
+        const lastToken = await tx.queue.findFirst({
+            where: {
+                serviceCenterId,
+            },
+            orderBy: {
+                tokenNumber: "desc",
+            },
+        });
+
+        const nextToken = lastToken ? lastToken.tokenNumber + 1 : 1;
+
+        // EXPIRY TIME
+        // const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 3);
+
+        await tx.queue.create({
+            data: {
+                userId,
+                serviceCenterId,
+                tokenNumber: nextToken,
+                // expiresAt,
+            },
+        });
     });
 
-    return queueEntry;
+    // 5. RETURN DIGITAL TICKET
+    return {
+        queueId: queueEntry.id,
+        ticketNumber: queueEntry.tokenNumber,
+        status: queueEntry.status,
+        serviceCenter: serviceCenter.name,
+        joinedAt: queueEntry.createdAt,
+        // expiresAt: queueEntry.expiresAt,
+    };
 };
 
 const getAllQueueService = async (serviceCenterId) => {
@@ -298,5 +330,5 @@ export {
     getQueuePositionService,
     getDisplayQueueDataService,
     getQueueStatsService,
-    resetQueueService
+    resetQueueService,
 };

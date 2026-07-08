@@ -1,27 +1,31 @@
 import { Router } from "express";
 
 import {
-  createQueueEntryController,
-    getAllQueueController,
-    callNextCustomerController,
-    completeCustomerController,
-    getCurrentTokenController,
-    getQueuePositionController,
-    getDisplayQueueDataController,
-    getQueueStatsController,
-    resetQueueController,
+    createQueueEntry,
+    getAllQueue,
+    callNextCustomer,
+    completeCustomer,
+    getCurrentToken,
+    getQueuePosition,
+    getDisplayQueueData,
+    getQueueStats,
+    resetQueue,
 } from "../controllers/queue.controller.js";
+import {
+    authMiddleware,
+    authorizeRoles,
+} from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.post("/", createQueueEntryController);
-router.get("/:serviceCenterId", getAllQueueController);
-router.patch("/next", callNextCustomerController);
-router.patch("/:queueId/complete", completeCustomerController);
-router.get("/current-token/:serviceCenterId", getCurrentTokenController);
-router.get("/position/:serviceCenterId/:queueId", getQueuePositionController);
-router.get("/display/:serviceCenterId", getDisplayQueueDataController);
-router.get("/stats/:serviceCenterId", getQueueStatsController);
-router.delete("/reset/:serviceCenterId", resetQueueController);
+router.post("/", authMiddleware, authorizeRoles("USER"), createQueueEntry);
+router.get("/:serviceCenterId", getAllQueue);
+router.patch("/next", callNextCustomer);
+router.patch("/:queueId/complete", completeCustomer);
+router.get("/current-token/:serviceCenterId", getCurrentToken);
+router.get("/position/:serviceCenterId/:queueId", getQueuePosition);
+router.get("/display/:serviceCenterId", getDisplayQueueData);
+router.get("/stats/:serviceCenterId", getQueueStats);
+router.delete("/reset/:serviceCenterId", resetQueue);
 
 export default router;

@@ -3,8 +3,8 @@ import { ApiError } from "../utils/ApiError.js";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^\+[1-9]\d{7,14}$/;
 
-// REGISTER VALIDATION
-const validateRegister = ({
+// USER REGISTER VALIDATION
+const validateUserRegister = ({
     fullName,
     email,
     password,
@@ -51,8 +51,8 @@ const validateRegister = ({
     }
 };
 
-// LOGIN VALIDATION
-const validateLogin = ({ email, password }) => {
+// USER LOGIN VALIDATION
+const validateUserLogin = ({ email, password }) => {
     if (!email?.trim()) {
         throw new ApiError(400, "Email is required");
     }
@@ -66,8 +66,8 @@ const validateLogin = ({ email, password }) => {
     }
 };
 
-// UPDATE VALIDATION
-const validateUpdate = ({
+// USER UPDATE VALIDATION
+const validateUserUpdate = ({
     fullName,
     email,
     password,
@@ -116,4 +116,4 @@ const validateUpdate = ({
     }
 };
 
-export { validateRegister, validateLogin, validateUpdate };
+export { validateUserRegister, validateUserLogin, validateUserUpdate };

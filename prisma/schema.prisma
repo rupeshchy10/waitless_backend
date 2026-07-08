@@ -11,6 +11,9 @@ enum QueueStatus {
     WAITING
     SERVING
     COMPLETED
+    CANCELLED
+    EXPIRED
+    NO_SHOW
 }
 
 enum Role {
@@ -19,39 +22,107 @@ enum Role {
     USER
 }
 
+enum QueuePriority {
+    NORMAL
+    VIP
+    EMERGENCY
+}
+
 model User {
-    id           String  @id @default(uuid())
+    id String @id @default(uuid())
+
     fullName     String
     email        String  @unique
     password     String
     phoneNumber  String
     address      String
     profileImage String?
-    role         Role    @default(STAFF)
+    role         Role    @default(USER)
+
+    queues           Queue[]
+    notifications    Notification[]
+    staffAssignments StaffAssignment[]
+    serviceCenters   ServiceCenter[]
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 }
 
 model ServiceCenter {
-    id   String @id @default(uuid())
-    name String
+    id          String  @id @default(uuid())
+    name        String
+    address     String
+    email       String  @unique
+    phoneNumber String
+    logo        String?
 
-    queues Queue[]
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    queues           Queue[]
+    staffAssignments StaffAssignment[]
+
+    openingTime        String @default("09:00")
+    closingTime        String @default("16:00")
+    averageServiceTime Int    @default(10)
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 }
 
-model Queue {
-    id           String @id @default(uuid())
-    tokenNumber  Int
-    customerName String
+model StaffAssignment {
+    id String @id @default(uuid())
 
-    status QueueStatus @default(WAITING)
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
 
     serviceCenterId String
     serviceCenter   ServiceCenter @relation(fields: [serviceCenterId], references: [id])
+
+    @@unique([userId, serviceCenterId])
+}
+
+model Queue {
+    id          String @id @default(uuid())
+    tokenNumber Int
+
+    status   QueueStatus   @default(WAITING)
+    priority QueuePriority @default(NORMAL)
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    serviceCenterId String
+    serviceCenter   ServiceCenter @relation(fields: [serviceCenterId], references: [id])
+
+    checkedIn Boolean @default(false)
+
+    expiresAt   DateTime?
+    servedAt    DateTime?
+    completedAt DateTime?
+    cancelledAt DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([serviceCenterId, tokenNumber])
+    @@index([serviceCenterId, status])
+    @@index([userId])
+    @@index([tokenNumber])
+}
+
+model Notification {
+    id String @id @default(uuid())
+
+    userId String
+
+    user User @relation(fields: [userId], references: [id])
+
+    title String
+
+    message String
+
+    isRead Boolean @default(false)
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
