@@ -1,6 +1,7 @@
 import { prisma } from "../utils/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
 
+// JOIN QUEUE
 const createQueueEntryService = async (userId, serviceCenterId) => {
     // 1. VALIDATE INPUT
     if (!serviceCenterId) {
@@ -53,11 +54,13 @@ const createQueueEntryService = async (userId, serviceCenterId) => {
         // EXPIRY TIME
         // const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 3);
 
-        await tx.queue.create({
+        return await tx.queue.create({
             data: {
                 userId,
                 serviceCenterId,
                 tokenNumber: nextToken,
+                status: "WAITING",
+                priority: "NORMAL",
                 // expiresAt,
             },
         });
@@ -74,6 +77,132 @@ const createQueueEntryService = async (userId, serviceCenterId) => {
     };
 };
 
+// GET MY ACTIVE QUEUE
+const getMyQueueService = async (userId) => {
+    const queue = await prisma.queue.findFirst({
+        where: {
+            userId,
+            status: {
+                in: ["WAITING", "SERVING"],
+            },
+        },
+        include: {
+            serviceCenter: {
+                select: {
+                    id: true,
+                    name: true,
+                    address: true,
+                    openingTime: true,
+                    closingTime: true,
+                    averageServiceTime: true,
+                },
+            },
+        },
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+
+    if (!queue) {
+        throw new ApiError(404, "No active queue found");
+    }
+
+    return queue;
+};
+
+// GET MY QUEUE HISTORY
+const getMyQueueHistoryService = async (userId) => {
+    const queueHistory = await prisma.queue.findMany({
+        where: {
+            userId,
+            status: {
+                in: ["COMPLETED", "CANCELLED", "EXPIRED", "NO_SHOW"],
+            },
+        },
+        include: {
+            serviceCenter: {
+                select: {
+                    id: true,
+                    name: true,
+                    address: true,
+                    phoneNumber: true,
+                },
+            },
+        },
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+    return queueHistory;
+};
+
+// GET QUEUE BY ID
+const getQueueByIdService = async (queueId, currentUser) => {
+    // 1. find queue
+    const queue = await prisma.queue.findUnique({
+        where: { id: queueId },
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    fullName: true,
+                    email: true,
+                    phoneNumber: true,
+                    address: true,
+                },
+            },
+            serviceCenter: {
+                select: {
+                    id: true,
+                    name: true,
+                    address: true,
+                },
+            },
+        },
+    });
+
+    if (!queue) {
+        throw new ApiError(404, "Queue not found");
+    }
+
+    // 2. ADMIN can access any queue
+    if (currentUser.role === "ADMIN") {
+        return queue;
+    }
+
+    // 3. USER can access only their own queue
+    if (currentUser.role === "USER") {
+        if (queue.userId !== currentUser.id) {
+            throw new ApiError(403, "You are not allowed to view this queue");
+        }
+        return queue;
+    }
+
+    // 4. STAFF must be assigned to this service center
+    if (currentUser.role === "STAFF") {
+        const assignment = await prisma.staffAssignment.findUnique({
+            where: {
+                userId_serviceCenterId: {
+                    userId: currentUser.id,
+                    serviceCenterId: queue.serviceCenterId,
+                },
+            },
+        });
+
+        if (!assignment) {
+            throw new ApiError(
+                403,
+                "You are not assigned to this service center"
+            );
+        }
+        return queue;
+    }
+    throw new ApiError(403, "Forbidden");
+};
+
+// GET QUEUE OF ONE SERVICE CENTER
+
+// GET ALL QUEUE
 const getAllQueueService = async (serviceCenterId) => {
     return await prisma.queue.findMany({
         where: {
@@ -85,6 +214,9 @@ const getAllQueueService = async (serviceCenterId) => {
     });
 };
 
+// CHECK IN
+
+// CALL NEXT CUSTOMER
 const callNextCustomerService = async (serviceCenterId) => {
     const currentServing = await prisma.queue.findFirst({
         where: {
@@ -133,6 +265,7 @@ const callNextCustomerService = async (serviceCenterId) => {
     return updatedCustomer;
 };
 
+// COMPLETE QUEUE
 const completeCustomerService = async (queueId) => {
     const queue = await prisma.queue.findUnique({
         where: {
@@ -154,6 +287,13 @@ const completeCustomerService = async (queueId) => {
     });
 };
 
+// CANCEL QUEUE
+
+// MARK NO SHOW
+
+// EXPIRE QUEUE
+
+// GET CURRENT TOKEN
 const getCurrentTokenService = async (serviceCenterId) => {
     const currentCustomer = await prisma.queue.findFirst({
         where: {
@@ -176,6 +316,7 @@ const getCurrentTokenService = async (serviceCenterId) => {
     };
 };
 
+// GET QUEUE POSITION
 const getQueuePositionService = async (serviceCenterId, queueId) => {
     const customer = await prisma.queue.findUnique({
         where: {
@@ -234,6 +375,7 @@ const getQueuePositionService = async (serviceCenterId, queueId) => {
     };
 };
 
+// DISPLAY QUEUE DATA
 const getDisplayQueueDataService = async (serviceCenterId) => {
     const nowServing = await prisma.queue.findFirst({
         where: {
@@ -271,6 +413,7 @@ const getDisplayQueueDataService = async (serviceCenterId) => {
     };
 };
 
+// QUEUE STATS
 const getQueueStatsService = async (serviceCenterId) => {
     const waiting = await prisma.queue.count({
         where: {
@@ -301,6 +444,7 @@ const getQueueStatsService = async (serviceCenterId) => {
     };
 };
 
+// RESET QUEUE
 const resetQueueService = async (serviceCenterId) => {
     const serviceCenter = await prisma.serviceCenter.findUnique({
         where: {
@@ -321,8 +465,13 @@ const resetQueueService = async (serviceCenterId) => {
     return null;
 };
 
+// UPDATE PRIORITY FOR EMERGENCY OR VIP
+
 export {
     createQueueEntryService,
+    getMyQueueService,
+    getQueueByIdService,
+    getMyQueueHistoryService,
     getAllQueueService,
     callNextCustomerService,
     completeCustomerService,

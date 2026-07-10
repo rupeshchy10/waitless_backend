@@ -2,6 +2,11 @@ import { Router } from "express";
 
 import {
     createQueueEntry,
+    getMyQueue,
+    
+    getMyQueueHistory,
+    getQueueById,
+    
     getAllQueue,
     callNextCustomer,
     completeCustomer,
@@ -18,7 +23,14 @@ import {
 
 const router = Router();
 
+// USER
 router.post("/", authMiddleware, authorizeRoles("USER"), createQueueEntry);
+router.get("/my-queue",authMiddleware,authorizeRoles("USER"),getMyQueue)
+router.get("/history",authMiddleware,authorizeRoles("USER"),getMyQueueHistory)
+
+// ADMIN/STAFF
+router.get("/:queueId",authMiddleware,authorizeRoles("ADMIN","STAFF","USER"),getQueueById);
+
 router.get("/:serviceCenterId", getAllQueue);
 router.patch("/next", callNextCustomer);
 router.patch("/:queueId/complete", completeCustomer);
