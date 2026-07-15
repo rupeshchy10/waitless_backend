@@ -3,22 +3,19 @@ import * as queueService from "../services/queue.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
-// JOIN QUEUE
-const createQueueEntry = asyncHandler(async (req, res) => {
-    const { serviceCenterId } = req.body;
+// 1. JOIN QUEUE
+const joinQueueEntry = asyncHandler(async (req, res) => {
     const { id } = req.user;
+    const { serviceCenterId } = req.params;
 
-    const queue = await queueService.createQueueEntryService(
-        id,
-        serviceCenterId
-    );
+    const queue = await queueService.joinQueueEntryService(id, serviceCenterId);
 
     return res
         .status(201)
-        .json(new ApiResponse(201, queue, "Queue ticket created successfully"));
+        .json(new ApiResponse(201, queue, "Queue joined successfully"));
 });
 
-// GET MY ACTIVE QUEUE
+// 2. GET MY ACTIVE QUEUE
 const getMyQueue = asyncHandler(async (req, res) => {
     const { id } = req.user;
 
@@ -29,7 +26,7 @@ const getMyQueue = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, myQueue, "My Queue fetched successfully"));
 });
 
-// GET MY QUEUE HISTORY
+// 3. GET MY QUEUE HISTORY
 const getMyQueueHistory = asyncHandler(async (req, res) => {
     const { id } = req.user;
 
@@ -46,7 +43,7 @@ const getMyQueueHistory = asyncHandler(async (req, res) => {
         );
 });
 
-// GET QUEUE BY ID (owner can view it, admin can view it, assigned staff can view it)
+// 4. GET QUEUE BY ID (owner can view it, admin can view it, assigned staff can view it)
 const getQueueById = asyncHandler(async (req, res) => {
     const { queueId } = req.params;
 
@@ -57,76 +54,161 @@ const getQueueById = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, queue, "Queue fetched successfully"));
 });
 
-// GET QUEUE OF ONE SERVICE CENTER (Admin->all, Assigned staff-> only assigned center)
-
-// GET ALL QUEUE
-const getAllQueue = asyncHandler(async (req, res) => {
+// 5. GET QUEUE OF ONE SERVICE CENTER (Admin->all, Assigned staff-> only assigned center)
+const getQueueByServiceCenter = asyncHandler(async (req, res) => {
     const { serviceCenterId } = req.params;
 
-    const queues = await queueService.getAllQueueService(serviceCenterId);
+    const queues = await queueService.getQueueByServiceCenterService(
+        serviceCenterId,
+        req.user
+    );
 
     return res
         .status(200)
         .json(new ApiResponse(200, queues, "Queue fetched successfully"));
 });
 
-// CHECK IN (checkedIn=true)
-
-// CALL NEXT CUSTOMER
-const callNextCustomer = asyncHandler(async (req, res) => {
-    const { serviceCenterId } = req.body;
-
-    const customer =
-        await queueService.callNextCustomerService(serviceCenterId);
+// 6. GET ALL QUEUE
+const getAllQueue = asyncHandler(async (req, res) => {
+    const queues = await queueService.getAllQueueService();
 
     return res
         .status(200)
-        .json(new ApiResponse(200, customer, "Next customer called"));
+        .json(new ApiResponse(200, queues, "Queue fetched successfully"));
 });
 
-// COMPLETE QUEUE
-const completeCustomer = asyncHandler(async (req, res) => {
-    const { queueId } = req.params;
+// 7. CHECK IN (checkedIn=true)
+const checkedInQueue = asyncHandler(async (req, res) => {
+    const { id } = req.user;
 
-    const customer = await queueService.completeCustomerService(queueId);
+    const checkedIn = await queueService.checkedInQueueService(id);
 
     return res
         .status(200)
-        .json(new ApiResponse(200, customer, "Customer completed"));
+        .json(new ApiResponse(200, checkedIn, "Checked in done successfully"));
 });
 
-// CANCEL QUEUE
-
-// MARK NO SHOW
-
-// EXPIRE QUEUE
-
-// GET CURRENT TOKEN
-const getCurrentToken = asyncHandler(async (req, res) => {
+// 8. GET CHECKED-IN LIST BY SERVICE CENTER
+const getCheckedInList = asyncHandler(async (req, res) => {
     const { serviceCenterId } = req.params;
 
-    const token = await queueService.getCurrentTokenService(serviceCenterId);
-
-    return res
-        .status(200)
-        .json(new ApiResponse(200, token, "Current token fetched"));
-});
-
-// GET QUEUE POSITION
-const getQueuePosition = asyncHandler(async (req, res) => {
-    const { serviceCenterId, queueId } = req.params;
-
-    const position = await queueService.getQueuePositionService(
+    const checkedInList = await queueService.getCheckedInListService(
         serviceCenterId,
-        queueId
+        req.user
     );
 
     return res
         .status(200)
-        .json(new ApiResponse(200, position, "Queue position fetched"));
+        .json(
+            new ApiResponse(
+                200,
+                checkedInList,
+                "Checked in list fetched successfully"
+            )
+        );
 });
 
-// DISPLAY QUEUE DATA
+// 9. UPDATE PRIORITY FOR EMERGENCY OR VIP
+const updateQueuePriority = asyncHandler(async (req, res) => {
+    const { queueId } = req.params;
+    const { priority } = req.body;
+
+    const queue = await queueService.updateQueuePriorityService(
+        queueId,
+        priority,
+        req.user
+    );
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, queue, "Queue priority updated successfully")
+        );
+});
+
+// 10. CALL NEXT CUSTOMER (STATUS MUST BE "WAITING" AND CHECKEDIN MUST BE TRUE)
+const callNextUser = asyncHandler(async (req, res) => {
+    const { serviceCenterId } = req.params;
+
+    const queue = await queueService.callNextUserService(
+        serviceCenterId,
+        req.user
+    );
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, queue, "Next user called successfully"));
+});
+
+// 11. COMPLETE QUEUE
+const completeQueue = asyncHandler(async (req, res) => {
+    const { serviceCenterId } = req.params;
+
+    const completedQueue = await queueService.completeQueueService(
+        serviceCenterId,
+        req.user
+    );
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, completedQueue, "Queue completed successfully")
+        );
+});
+
+// 12. MARK NO_SHOW (STAFF CALLED THE CHECKED_IN USER BUT THE USER NEVER ARRIVED)
+const markNoShowUser = asyncHandler(async (req, res) => {
+    const { serviceCenterId } = req.params;
+
+    const queue = await queueService.markNoShowUserService(
+        serviceCenterId,
+        req.user
+    );
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, queue, "User marked as no_show successfully")
+        );
+});
+
+// 13. CANCEL QUEUE (ONLY QUEUE OWNER CAN CANCEL THEIR QUEUE BY ID)
+const cancelQueue = asyncHandler(async (req, res) => {
+    const { queueId } = req.params;
+
+    const cancelledQueue = await queueService.cancelQueueService(
+        queueId,
+        req.user
+    );
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, cancelledQueue, "Queue cancelled successfully")
+        );
+});
+
+// 14. GET QUEUE POSITION
+const getQueuePosition = asyncHandler(async (req, res) => {
+    const { queueId } = req.params;
+
+    const queuePosition = await queueService.getQueuePositionService(
+        queueId,
+        req.user
+    );
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                queuePosition,
+                "Queue position fetched successfully"
+            )
+        );
+});
+
+// 15. DISPLAY QUEUE DATA (PUBLICLY AVAILABLE SO THAT EVERYONE CAN SEE IT)
 const getDisplayQueueData = asyncHandler(async (req, res) => {
     const { serviceCenterId } = req.params;
 
@@ -139,12 +221,12 @@ const getDisplayQueueData = asyncHandler(async (req, res) => {
             new ApiResponse(
                 200,
                 displayData,
-                "Display data fetched successfully"
+                "Queue display data fetched successfully"
             )
         );
 });
 
-// QUEUE STATS
+// 16. QUEUE STATS
 const getQueueStats = asyncHandler(async (req, res) => {
     const { serviceCenterId } = req.params;
 
@@ -153,46 +235,57 @@ const getQueueStats = asyncHandler(async (req, res) => {
     return res
         .status(200)
         .json(
-            new ApiResponse(200, stats, "Queue Stats displayed successfully")
+            new ApiResponse(
+                200,
+                stats,
+                "Queue statistics displayed successfully"
+            )
         );
 });
 
-// RESET QUEUE
-const resetQueue = asyncHandler(async (req, res) => {
+// 17. CLOSE DAY (IN CASE OF EMERGENCY CLOSING OFFICE)
+const closeDay = asyncHandler(async (req, res) => {
     const { serviceCenterId } = req.params;
 
-    await queueService.resetQueueService(serviceCenterId);
+    const result = await queueService.closeDayService(
+        serviceCenterId,
+        req.user
+    );
 
     return res
         .status(200)
-        .json(new ApiResponse(200, null, "Queue reset successfully"));
+        .json(
+            new ApiResponse(200, result, "Service center closed successfully")
+        );
 });
 
-// UPDATE PRIORITY FOR EMERGENCY OR VIP
-
 export {
-    createQueueEntry,
-    getMyQueue,getMyQueueHistory,
-
+    joinQueueEntry,
+    getMyQueue,
+    getMyQueueHistory,
+    getQueueByServiceCenter,
     getQueueById,
     getAllQueue,
-    callNextCustomer,
-    completeCustomer,
-    getCurrentToken,
+    checkedInQueue,
+    getCheckedInList,
+    updateQueuePriority,
+    callNextUser,
+    completeQueue,
+    markNoShowUser,
+    cancelQueue,
     getQueuePosition,
     getDisplayQueueData,
     getQueueStats,
-    resetQueue,
+    closeDay,
 };
 
 // JOIN QUEUE.....................
 // GET MY QUEUES..................
 // GET QUEUE BY ID................
-
-
 // GET QUEUE OF ONE SERVICE CENTER.......
 // GET ALL QUEUE..................
 // CHECK IN ......................
+
 // CALL NEXT CUSTOMER.............
 // COMPLETE QUEUE.................
 // CANCEL QUEUE...................

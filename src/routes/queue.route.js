@@ -1,20 +1,23 @@
 import { Router } from "express";
 
 import {
-    createQueueEntry,
+    joinQueueEntry,
     getMyQueue,
-    
     getMyQueueHistory,
+    getQueueByServiceCenter,
     getQueueById,
-    
     getAllQueue,
-    callNextCustomer,
-    completeCustomer,
-    getCurrentToken,
+    checkedInQueue,
+    getCheckedInList,
+    updateQueuePriority,
+    callNextUser,
+    completeQueue,
+    markNoShowUser,
+    cancelQueue,
     getQueuePosition,
     getDisplayQueueData,
     getQueueStats,
-    resetQueue,
+    closeDay,
 } from "../controllers/queue.controller.js";
 import {
     authMiddleware,
@@ -23,21 +26,93 @@ import {
 
 const router = Router();
 
-// USER
-router.post("/", authMiddleware, authorizeRoles("USER"), createQueueEntry);
-router.get("/my-queue",authMiddleware,authorizeRoles("USER"),getMyQueue)
-router.get("/history",authMiddleware,authorizeRoles("USER"),getMyQueueHistory)
+router.post(
+    "/join/:serviceCenterId",
+    authMiddleware,
+    authorizeRoles("USER"),
+    joinQueueEntry
+);
+router.get("/my-queue", authMiddleware, authorizeRoles("USER"), getMyQueue);
+router.get(
+    "/history",
+    authMiddleware,
+    authorizeRoles("USER"),
+    getMyQueueHistory
+);
+router.get(
+    "/service-center/:serviceCenterId",
+    authMiddleware,
+    authorizeRoles("ADMIN", "STAFF"),
+    getQueueByServiceCenter
+);
+router.get(
+    "/:queueId",
+    authMiddleware,
+    authorizeRoles("ADMIN", "STAFF", "USER"),
+    getQueueById
+);
+router.get("/", getAllQueue);
+router.patch(
+    "/checked-in",
+    authMiddleware,
+    authorizeRoles("USER"),
+    checkedInQueue
+);
+router.get(
+    "/checked-in/:serviceCenterId",
+    authMiddleware,
+    authorizeRoles("ADMIN", "STAFF"),
+    getCheckedInList
+);
+router.patch(
+    "/:queueId/priority",
+    authMiddleware,
+    authorizeRoles("ADMIN", "STAFF"),
+    updateQueuePriority
+);
 
-// ADMIN/STAFF
-router.get("/:queueId",authMiddleware,authorizeRoles("ADMIN","STAFF","USER"),getQueueById);
-
-router.get("/:serviceCenterId", getAllQueue);
-router.patch("/next", callNextCustomer);
-router.patch("/:queueId/complete", completeCustomer);
-router.get("/current-token/:serviceCenterId", getCurrentToken);
-router.get("/position/:serviceCenterId/:queueId", getQueuePosition);
+router.patch(
+    "/call-next/:serviceCenterId",
+    authMiddleware,
+    authorizeRoles("ADMIN", "STAFF"),
+    callNextUser
+);
+router.patch(
+    "/complete/:serviceCenterId",
+    authMiddleware,
+    authorizeRoles("ADMIN", "STAFF"),
+    completeQueue
+);
+router.patch(
+    "/no-show/:serviceCenterId",
+    authMiddleware,
+    authorizeRoles("ADMIN", "STAFF"),
+    markNoShowUser
+);
+router.patch(
+    "/cancel/:queueId",
+    authMiddleware,
+    authorizeRoles("USER"),
+    cancelQueue
+);
+router.get(
+    "/position/:queueId",
+    authMiddleware,
+    authorizeRoles("USER", "ADMIN", "STAFF"),
+    getQueuePosition
+);
 router.get("/display/:serviceCenterId", getDisplayQueueData);
-router.get("/stats/:serviceCenterId", getQueueStats);
-router.delete("/reset/:serviceCenterId", resetQueue);
+router.get(
+    "/stats/:serviceCenterId",
+    authMiddleware,
+    authorizeRoles("ADMIN", "STAFF"),
+    getQueueStats
+);
+router.patch(
+    "/close-day/:serviceCenterId",
+    authMiddleware,
+    authorizeRoles("ADMIN", "STAFF"),
+    closeDay
+);
 
 export default router;

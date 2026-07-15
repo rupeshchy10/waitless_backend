@@ -62,9 +62,13 @@ model ServiceCenter {
     queues           Queue[]
     staffAssignments StaffAssignment[]
 
-    openingTime        String @default("09:00")
-    closingTime        String @default("16:00")
-    averageServiceTime Int    @default(10)
+    openingHour   Int @default(9)
+    openingMinute Int @default(0)
+
+    closingHour   Int @default(16)
+    closingMinute Int @default(0)
+
+    averageServiceTime Int @default(10)
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt

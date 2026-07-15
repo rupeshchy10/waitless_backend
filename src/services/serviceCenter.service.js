@@ -1,5 +1,6 @@
 import { prisma } from "../utils/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
+import { formatNepalTime } from "../utils/time.js";
 
 const safeServiceCenterSelect = {
     id: true,
@@ -8,8 +9,10 @@ const safeServiceCenterSelect = {
     phoneNumber: true,
     address: true,
     logo: true,
-    openingTime: true,
-    closingTime: true,
+    openingHour: true,
+    openingMinute: true,
+    closingHour: true,
+    closingMinute: true,
     averageServiceTime: true,
     createdAt: true,
     updatedAt: true,
@@ -37,7 +40,17 @@ const getAllServiceCentersService = async () => {
             },
         },
     });
-    return users;
+
+    const formattedUser = users.map((user) => ({
+        ...user,
+        serviceCenters: user.serviceCenters.map((serviceCenter) => ({
+            ...serviceCenter,
+            createdAtNepalTime: formatNepalTime(serviceCenter.createdAt),
+            updatedAtNepalTime: formatNepalTime(serviceCenter.updatedAt),
+        })),
+    }));
+
+    return formattedUser;
 };
 
 // GET MY SERVICE CENTERS
@@ -59,7 +72,17 @@ const getMyServiceCentersService = async (userId) => {
             },
         },
     });
-    return user;
+
+    const formattedUser = {
+        ...user,
+        serviceCenters: user.serviceCenters.map((serviceCenter) => ({
+            ...serviceCenter,
+            createdAtNepalTime: formatNepalTime(serviceCenter.createdAt),
+            updatedAtNepalTime: formatNepalTime(serviceCenter.updatedAt),
+        })),
+    };
+
+    return formattedUser;
 };
 
 // GET SERVICE CENTER BY ID
@@ -72,7 +95,11 @@ const getServiceCenterByIdService = async (id) => {
         throw new ApiError(404, "Service center not found");
     }
 
-    return serviceCenter;
+    return {
+        ...serviceCenter,
+        createdAtNepalTime: formatNepalTime(serviceCenter.createdAt),
+        updatedAtNepalTime: formatNepalTime(serviceCenter.updatedAt),
+    };
 };
 
 // REGISTER SERVICE CENTER
@@ -84,8 +111,10 @@ const registerServiceCenterService = async (
         phoneNumber,
         address,
         logo,
-        openingTime,
-        closingTime,
+        openingHour,
+        openingMinute,
+        closingHour,
+        closingMinute,
         averageServiceTime,
     }
 ) => {
@@ -108,13 +137,19 @@ const registerServiceCenterService = async (
             phoneNumber: phoneNumber.trim(),
             address: address.trim(),
             logo,
-            openingTime,
-            closingTime,
+            openingHour,
+            openingMinute,
+            closingHour,
+            closingMinute,
             averageServiceTime,
         },
     });
 
-    return newServiceCenter;
+    return {
+        ...newServiceCenter,
+        createdAtNepalTime: formatNepalTime(newServiceCenter.createdAt),
+        updatedAtNepalTime: formatNepalTime(newServiceCenter.updatedAt),
+    };
 };
 
 // UPDATE SERVICE CENTER
@@ -126,8 +161,10 @@ const updateServiceCenterService = async (
         phoneNumber,
         address,
         logo,
-        openingTime,
-        closingTime,
+        openingHour,
+        openingMinute,
+        closingHour,
+        closingMinute,
         averageServiceTime,
     }
 ) => {
@@ -177,11 +214,17 @@ const updateServiceCenterService = async (
     if (logo !== undefined) {
         updateData.logo = logo;
     }
-    if (openingTime !== undefined) {
-        updateData.openingTime = openingTime;
+    if (openingHour !== undefined) {
+        updateData.openingHour = openingHour;
     }
-    if (closingTime !== undefined) {
-        updateData.closingTime = closingTime;
+    if (openingMinute !== undefined) {
+        updateData.openingMinute = openingMinute;
+    }
+    if (closingHour !== undefined) {
+        updateData.closingHour = closingHour;
+    }
+    if (closingMinute !== undefined) {
+        updateData.closingMinute = closingMinute;
     }
     if (averageServiceTime !== undefined) {
         updateData.averageServiceTime = averageServiceTime;
@@ -192,7 +235,11 @@ const updateServiceCenterService = async (
         data: updateData,
     });
 
-    return updatedServiceCenter;
+    return {
+        ...updatedServiceCenter,
+        createdAtNepalTime: formatNepalTime(serviceCenter.createdAt),
+        updatedAtNepalTime: formatNepalTime(serviceCenter.updatedAt),
+    };
 };
 
 // DELETE SERVICE CENTER
