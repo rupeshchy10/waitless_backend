@@ -1,5 +1,6 @@
 import { formatNepalTime } from "./time.js";
 
+// FORMAT OUTPUT IN NEPAL TIME
 const formatOutput = (output) => {
     if (!output) return null;
 
@@ -22,4 +23,28 @@ const formatMultipleOutputs = (outputs) => {
     return outputs.map(formatOutput);
 };
 
-export { formatOutput, formatMultipleOutputs };
+// FORMAT NOTIFICATION OUTPUT IN NEPAL TIME
+const formatNotificationOutput = (notification) => {
+    if (!notification) return null;
+
+    return {
+        ...notification,
+        nepalTime: {
+            createdAtNepalTime: formatNepalTime(notification.createdAt),
+            updatedAtNepalTime: formatNepalTime(notification.updatedAt),
+        },
+    };
+};
+
+const formatMultipleNotificationOutputs = (notifications) => {
+    if (!notifications) return [];
+
+    return notifications.map(formatNotificationOutput);
+};
+
+export {
+    formatOutput,
+    formatMultipleOutputs,
+    formatNotificationOutput,
+    formatMultipleNotificationOutputs,
+};

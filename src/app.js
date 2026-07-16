@@ -1,14 +1,13 @@
 import express from "express";
-import serviceCenterRoutes from "./routes/serviceCenter.route.js";
-import queueRoutes from "./routes/queue.route.js";
 import userRoutes from "./routes/user.route.js";
+import serviceCenterRoutes from "./routes/serviceCenter.route.js";
 import staffAssignmentRoutes from "./routes/staffAssignment.route.js";
+import queueRoutes from "./routes/queue.route.js";
+import notificationRoutes from "./routes/notification.route.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import { ApiError } from "./utils/ApiError.js";
 import cookieParser from "cookie-parser";
 
-import swaggerUi from "swagger-ui-express";
-import swaggerSpec from "./config/swagger.js";
 
 const app = express();
 
@@ -31,16 +30,17 @@ app.get("/test", (req, res) => {
 });
 
 // HOME ROUTE
-app.get("/", (req, res) => {
-    res.redirect("/api-docs");
-});
+// app.get("/", (req, res) => {
+//     res.redirect("/api-docs");
+// });
 
 // API ROUTES
-app.use("/api/v1/service-centers", serviceCenterRoutes);
-app.use("/api/v1/queue", queueRoutes);
 app.use("/api/v1/user", userRoutes);
+app.use("/api/v1/service-centers", serviceCenterRoutes);
 app.use("/api/v1/staff-assignment", staffAssignmentRoutes);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/api/v1/queue", queueRoutes);
+app.use("/api/v1/notification", notificationRoutes);
+// app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // 404 HANDLER
 // PUT THIS ALWAYS AFTER API ROUTES, OTHERWISE ROUTES WILL BE NEVER FOUND

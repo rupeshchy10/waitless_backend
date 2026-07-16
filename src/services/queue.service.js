@@ -5,6 +5,7 @@ import {
     formatOutput,
     formatMultipleOutputs,
 } from "../utils/formatNepalOutput.js";
+import createNotification from "../utils/createNotification.js";
 
 const safeServiceCenterSelect = {
     id: true,
@@ -22,12 +23,12 @@ const safeServiceCenterSelect = {
 
 // 1. JOIN QUEUE
 const joinQueueEntryService = async (userId, serviceCenterId) => {
-    // 1.1. Validate input
+    // 1. Validate input
     if (!serviceCenterId) {
         throw new ApiError(400, "Service center id is required");
     }
 
-    // 1.2. Check if service center exists?
+    // 2. Check if service center exists?
     const serviceCenter = await prisma.serviceCenter.findUnique({
         where: {
             id: serviceCenterId,
@@ -39,7 +40,7 @@ const joinQueueEntryService = async (userId, serviceCenterId) => {
         throw new ApiError(404, "Service center not found");
     }
 
-    // 1.3. Current time
+    // 3. Current time
     const now = new Date();
 
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -50,7 +51,7 @@ const joinQueueEntryService = async (userId, serviceCenterId) => {
     const closingMinutes =
         serviceCenter.closingHour * 60 + serviceCenter.closingMinute;
 
-    // 1.4. Allow booking only after 12 am and before closing
+    // 4. Allow booking only after 12 am and before closing
     if (currentMinutes >= closingMinutes) {
         throw new ApiError(
             400,
@@ -58,14 +59,14 @@ const joinQueueEntryService = async (userId, serviceCenterId) => {
         );
     }
 
-    // 1.5. Today's range
+    // 5. Today's range
     const startOfDay = new Date(now);
     startOfDay.setHours(0, 0, 0, 0);
 
     const endOfDay = new Date(now);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // 1.6. Already joined today?
+    // 6. Already joined today?
     const existingQueue = await prisma.queue.findFirst({
         where: {
             userId,
@@ -84,7 +85,7 @@ const joinQueueEntryService = async (userId, serviceCenterId) => {
         throw new ApiError(409, "You already joined this queue today.");
     }
 
-    // 1.7. Transaction
+    // 7. Transaction
     const queueEntry = await prisma.$transaction(async (tx) => {
         const lastToken = await tx.queue.findFirst({
             where: {
@@ -122,7 +123,7 @@ const joinQueueEntryService = async (userId, serviceCenterId) => {
         });
     });
 
-    // 1.8. People ahead
+    // 8. People ahead
     const peopleAhead = await prisma.queue.count({
         where: {
             serviceCenterId,
@@ -137,13 +138,24 @@ const joinQueueEntryService = async (userId, serviceCenterId) => {
         },
     });
 
-    // 1.9. Estimated waiting time
+    // 9. Estimated waiting time
     const estimatedWaitMinutes = peopleAhead * serviceCenter.averageServiceTime;
 
-    // 1.10. Position
+    // 10. Position
     const position = peopleAhead + 1;
 
-    // 1.11. Digital Ticket
+    // 11. Create notification
+    await createNotification({
+        userId,
+        title: "Queue joined",
+        message: `You joined ${serviceCenter.name}. Your token number is ${
+            queueEntry.tokenNumber
+        }. There ${peopleAhead === 1 ? "is" : "are"} ${peopleAhead} ${
+            peopleAhead === 1 ? "customer" : "customers"
+        } ahead of you.`,
+    });
+
+    // 12. Digital Ticket
     return {
         queueId: queueEntry.id,
         tokenNumber: queueEntry.tokenNumber,
@@ -223,7 +235,7 @@ const getMyQueueHistoryService = async (userId) => {
 
 // 4. GET QUEUE BY ID
 const getQueueByIdService = async (queueId, currentUser) => {
-    // 4.1. find queue
+    // 1. find queue
     const queue = await prisma.queue.findUnique({
         where: { id: queueId },
         include: {
@@ -250,12 +262,12 @@ const getQueueByIdService = async (queueId, currentUser) => {
         throw new ApiError(404, "Queue not found");
     }
 
-    // 4.2. ADMIN can access any queue
+    // 2. ADMIN can access any queue
     if (currentUser.role === "ADMIN") {
         return formatOutput(queue);
     }
 
-    // 4.3. USER can access only their own queue
+    // 3. USER can access only their own queue
     if (currentUser.role === "USER") {
         if (queue.userId !== currentUser.id) {
             throw new ApiError(403, "You are not allowed to view this queue");
@@ -263,7 +275,7 @@ const getQueueByIdService = async (queueId, currentUser) => {
         return formatOutput(queue);
     }
 
-    // 4.4. STAFF must be assigned to this service center
+    // 4. STAFF must be assigned to this service center
     if (currentUser.role === "STAFF") {
         const assignment = await prisma.staffAssignment.findUnique({
             where: {
@@ -287,7 +299,7 @@ const getQueueByIdService = async (queueId, currentUser) => {
 
 // 5. GET QUEUE OF ONE SERVICE CENTER
 const getQueueByServiceCenterService = async (serviceCenterId, currentUser) => {
-    // 5.1. Check if service center exists
+    // 1. Check if service center exists
     const serviceCenter = await prisma.serviceCenter.findUnique({
         where: { id: serviceCenterId },
         select: {
@@ -301,7 +313,7 @@ const getQueueByServiceCenterService = async (serviceCenterId, currentUser) => {
         throw new ApiError("Service center not found");
     }
 
-    // 5.2. If STAFF, verify assignment
+    // 2. If STAFF, verify assignment
     if (currentUser.role === "STAFF") {
         const assignment = await prisma.staffAssignment.findUnique({
             where: {
@@ -320,7 +332,7 @@ const getQueueByServiceCenterService = async (serviceCenterId, currentUser) => {
         }
     }
 
-    // 5.3. Fetch queue
+    // 3. Fetch queue
     const queues = await prisma.queue.findMany({
         where: { serviceCenterId },
         include: {
@@ -403,18 +415,15 @@ const checkedInQueueService = async (userId) => {
         },
     });
 
-    const formattedQueue = {
-        ...updatedQueue,
-        nepalTime: {
-            expiresAtNepalTime: formatNepalTime(updatedQueue.expiresAt),
-            servedAtNepalTime: formatNepalTime(updatedQueue.servedAt),
-            completedAtNepalTime: formatNepalTime(updatedQueue.completedAt),
-            cancelledAtNepalTime: formatNepalTime(updatedQueue.cancelledAt),
-            updatedAtNepalTime: formatNepalTime(updatedQueue.updatedAt),
-        },
-    };
+    // Create notification
+    await createNotification({
+        userId,
+        title: "Check-in Successful",
+        message:
+            "You have successfully checked in. Please wait until your token is called.",
+    });
 
-    return formattedQueue;
+    return formatOutput(updatedQueue);
 };
 
 // 8. GET CHECKED-IN LIST
@@ -498,7 +507,7 @@ const getCheckedInListService = async (serviceCenterId, currentUser) => {
 
 // 9. UPDATE QUEUE PRIORITY TO EMERGENCY OR VIP
 const updateQueuePriorityService = async (queueId, priority, currentUser) => {
-    // 9.1. Find queue
+    // 1. Find queue
     const queue = await prisma.queue.findUnique({
         where: {
             id: queueId,
@@ -509,7 +518,7 @@ const updateQueuePriorityService = async (queueId, priority, currentUser) => {
         throw new ApiError(404, "Queue not found");
     }
 
-    // 9.2. Queue must be waiting
+    // 2. Queue must be waiting
     if (queue.status !== "WAITING") {
         throw new ApiError(
             400,
@@ -517,7 +526,7 @@ const updateQueuePriorityService = async (queueId, priority, currentUser) => {
         );
     }
 
-    // 9.3. Validate priority
+    // 3. Validate priority
     if (!["VIP", "EMERGENCY", "NORMAL"].includes(priority)) {
         throw new ApiError(
             400,
@@ -525,12 +534,12 @@ const updateQueuePriorityService = async (queueId, priority, currentUser) => {
         );
     }
 
-    // 9.4. Already updated?
+    // 4. Already updated?
     if (queue.priority === priority) {
         throw new ApiError(409, `Queue is already ${priority}`);
     }
 
-    // 9.5. STAFF permission
+    // 5. STAFF permission
     if (currentUser.role === "STAFF") {
         const assignment = await prisma.staffAssignment.findUnique({
             where: {
@@ -549,7 +558,7 @@ const updateQueuePriorityService = async (queueId, priority, currentUser) => {
         }
     }
 
-    // 9.6. Update queue
+    // 6. Update queue
     const updatedQueue = await prisma.queue.update({
         where: {
             id: queueId,
@@ -559,12 +568,19 @@ const updateQueuePriorityService = async (queueId, priority, currentUser) => {
         },
     });
 
+    // 7. Create notification
+    await createNotification({
+        userId: updatedQueue.userId,
+        title: "Priority Updated",
+        message: `Your queue priority has been updated to ${priority}.`,
+    });
+
     return formatOutput(updatedQueue);
 };
 
 // 10. CALL NEXT CUSTOMER
 const callNextUserService = async (serviceCenterId, currentUser) => {
-    // 10.1. Check service center
+    // 1. Check service center
     const serviceCenter = await prisma.serviceCenter.findUnique({
         where: { id: serviceCenterId },
         select: {
@@ -578,7 +594,7 @@ const callNextUserService = async (serviceCenterId, currentUser) => {
         throw new ApiError(404, "Service center not found");
     }
 
-    // 10.2. STAFF can only call users from their assigned service center
+    // 2. STAFF can only call users from their assigned service center
     if (currentUser.role === "STAFF") {
         const assignment = await prisma.staffAssignment.findUnique({
             where: {
@@ -597,7 +613,7 @@ const callNextUserService = async (serviceCenterId, currentUser) => {
         }
     }
 
-    // 10.3. Check if someone is already being served
+    // 3. Check if someone is already being served
     const currentServing = await prisma.queue.findFirst({
         where: {
             serviceCenterId,
@@ -612,7 +628,7 @@ const callNextUserService = async (serviceCenterId, currentUser) => {
         );
     }
 
-    // 10.4. Find next checked-in waiting user
+    // 4. Find next checked-in waiting user
     const waitingUser = await prisma.queue.findFirst({
         where: {
             serviceCenterId,
@@ -626,7 +642,7 @@ const callNextUserService = async (serviceCenterId, currentUser) => {
         throw new ApiError(404, "No checked-in user is waiting in queue");
     }
 
-    // 10.5. Update status
+    // 5. Update status
     const updatedUser = await prisma.queue.update({
         where: {
             id: waitingUser.id,
@@ -650,12 +666,19 @@ const callNextUserService = async (serviceCenterId, currentUser) => {
         },
     });
 
+    // 6. Create notification
+    await createNotification({
+        userId: updatedUser.userId,
+        title: "It's Your Turn",
+        message: `Your token ${updatedUser.tokenNumber} is now being served at ${serviceCenter.name}.Please proceed to the service counter.`,
+    });
+
     return formatOutput(updatedUser);
 };
 
 // 11. COMPLETE QUEUE
 const completeQueueService = async (serviceCenterId, currentUser) => {
-    // 11.1. Find service center
+    // 1. Find service center
     const serviceCenter = await prisma.serviceCenter.findUnique({
         where: { id: serviceCenterId },
         select: {
@@ -669,7 +692,7 @@ const completeQueueService = async (serviceCenterId, currentUser) => {
         throw new ApiError(404, "Service center not found");
     }
 
-    // 11.2. STAFF can complete queues only from their assigned service center
+    // 2. STAFF can complete queues only from their assigned service center
     if (currentUser.role === "STAFF") {
         const assignment = await prisma.staffAssignment.findUnique({
             where: {
@@ -688,7 +711,7 @@ const completeQueueService = async (serviceCenterId, currentUser) => {
         }
     }
 
-    // 11.3. Find currently serving queue
+    // 3. Find currently serving queue
     const servingUser = await prisma.queue.findFirst({
         where: {
             serviceCenterId,
@@ -713,7 +736,7 @@ const completeQueueService = async (serviceCenterId, currentUser) => {
         throw new ApiError(404, "No user is currently being served");
     }
 
-    // 11.4. Complete queue
+    // 4. Complete queue
     const CompletedUser = await prisma.queue.update({
         where: {
             id: servingUser.id,
@@ -735,6 +758,13 @@ const completeQueueService = async (serviceCenterId, currentUser) => {
                 select: safeServiceCenterSelect,
             },
         },
+    });
+
+    // 5. Create notification
+    await createNotification({
+        userId: completedUser.userId,
+        title: "Service Completed",
+        message: `Your service at ${serviceCenter.name} has been completed. Thank you for using WaitLess.`,
     });
 
     return formatOutput(CompletedUser);
@@ -806,12 +836,19 @@ const markNoShowUserService = async (serviceCenterId, currentUser) => {
         },
     });
 
+    // Create notification
+    await createNotification({
+        userId: updatedQueue.userId,
+        title: "No Show",
+        message: `You missed your turn at ${serviceCenter.name}. Your queue has been marked as No Show.`,
+    });
+
     return formatOutput(updatedQueue);
 };
 
 // 13. CANCEL QUEUE
 const cancelQueueService = async (queueId, currentUser) => {
-    // 13.1. Find active queue
+    // 1. Find active queue
     const queue = await prisma.queue.findFirst({
         where: {
             id: queueId,
@@ -837,7 +874,7 @@ const cancelQueueService = async (queueId, currentUser) => {
         throw new ApiError(404, "Waiting queue not found");
     }
 
-    // 13.2. Cancel queue
+    // 2. Cancel queue
     const cancelledQueue = await prisma.queue.update({
         where: {
             id: queue.id,
@@ -859,6 +896,13 @@ const cancelQueueService = async (queueId, currentUser) => {
                 select: safeServiceCenterSelect,
             },
         },
+    });
+
+    // 3. Create notification
+    await createNotification({
+        userId: cancelledQueue.userId,
+        title: "Queue Cancelled",
+        message: `Your queue at ${cancelledQueue.serviceCenter.name} has been cancelled successfully.`,
     });
 
     return formatOutput(cancelledQueue);
@@ -1093,7 +1137,7 @@ const getQueueStatsService = async (serviceCenterId) => {
 
 // 17. CLOSE DAY
 const closeDayService = async (serviceCenterId, currentUser) => {
-    // 17.1. Check service center
+    // 1 Check service center
     const serviceCenter = await prisma.serviceCenter.findUnique({
         where: {
             id: serviceCenterId,
@@ -1108,7 +1152,7 @@ const closeDayService = async (serviceCenterId, currentUser) => {
         throw new ApiError(404, "Service center not found");
     }
 
-    // 17.2. STAFF can only close their assigned service center
+    // 2 STAFF can only close their assigned service center
     if (currentUser.role === "STAFF") {
         const assignment = await prisma.staffAssignment.findUnique({
             where: {
@@ -1127,7 +1171,31 @@ const closeDayService = async (serviceCenterId, currentUser) => {
         }
     }
 
-    // 17.3. Expire waiting queues
+    // 3 Find waiting queues
+    const waitingQueues = await prisma.queue.findMany({
+        where: {
+            serviceCenterId,
+            status: "WAITING",
+        },
+        select: {
+            id: true,
+            userId: true,
+        },
+    });
+
+    // 4 Find serving queues
+    const servingQueues = await prisma.queue.findMany({
+        where: {
+            serviceCenterId,
+            status: "SERVING",
+        },
+        select: {
+            id: true,
+            userId: true,
+        },
+    });
+
+    // 5 Expire waiting queues
     const expiredQueues = await prisma.queue.updateMany({
         where: {
             serviceCenterId,
@@ -1138,7 +1206,7 @@ const closeDayService = async (serviceCenterId, currentUser) => {
         },
     });
 
-    // 17.4. Mark serving queue as NO_SHOW
+    // 6 Mark serving queues as NO_SHOW
     const noShowQueues = await prisma.queue.updateMany({
         where: {
             serviceCenterId,
@@ -1149,10 +1217,35 @@ const closeDayService = async (serviceCenterId, currentUser) => {
         },
     });
 
+    // 7 Send notifications to expired queues
+    await Promise.all(
+        waitingQueues.map((queue) =>
+            createNotification({
+                userId: queue.userId,
+                title: "Queue Expired",
+                message: `Your queue has expired because ${serviceCenter.name} has closed for today.`,
+            })
+        )
+    );
+
+    // 8 Send notifications to no-show queues
+    await Promise.all(
+        servingQueues.map((queue) =>
+            createNotification({
+                userId: queue.userId,
+                title: "No Show",
+                message:
+                    "You missed your turn before the service center closed. Your queue has been marked as No Show.",
+            })
+        )
+    );
+
+    // 9 Return summary
     return {
         serviceCenter: serviceCenter.name,
         expiredQueues: expiredQueues.count,
         noShowQueues: noShowQueues.count,
+        totalNotifications: waitingQueues.length + servingQueues.length,
         message: "Day closed successfully",
     };
 };
