@@ -24,14 +24,14 @@ const router = Router();
 
 router.post("/register", validate(validateUserRegister), registerUser);
 router.post("/login", validate(validateUserLogin), loginUser);
-router.get("/", authMiddleware, authorizeRoles("ADMIN", "STAFF"), getAllUsers);
+router.get("/all-lists", authMiddleware, authorizeRoles("ADMIN", "STAFF"), getAllUsers);
 router.get("/profile", authMiddleware, getOwnProfile);
 router.post("/logout", authMiddleware, logout);
 
-router.put("/:id", validate(validateUserUpdate), authMiddleware, updateUser);
-router.delete("/:id", authMiddleware, deleteUser);
+router.put("/update/:id", validate(validateUserUpdate), authMiddleware, updateUser);
+router.delete("/delete/:id", authMiddleware, deleteUser);
 router.get(
-    "/:id",
+    "/info/:id",
     authMiddleware,
     authorizeRoles("ADMIN", "STAFF"),
     getUserById

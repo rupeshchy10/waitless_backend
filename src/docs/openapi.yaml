@@ -1,0 +1,2035 @@
+openapi: 3.0.0
+
+info:
+    title: WaitLess API
+    version: 1.0.0
+    description: |
+        WaitLess is a Queue Management System REST API that lets users to join virtual queues, track their position in real time, receive notifications and lets staff/admin manage service centers and queues.
+
+
+        ## Features
+        - JWT Cookie Authentication
+        - Role-Based Access Control (Admin, Staff & User)
+        - Queue Management (join, check-in, call next, priority, stats)
+        - Service Center Management
+        - Staff assignment to service centers
+        - Notification System
+        - Queue Analytics
+        - Nepal time formatted timestamps
+
+        ## Technology Stack
+        - Node.js
+        - Express.js
+        - PostgreSQL
+        - Prisma ORM
+
+        ## Authentication
+        WaitLess uses a JWT stored inside an **HttpOnly Cookie** for authentication.
+
+        After a successful login, the server automatically sets a secure `jwt` cookie. All subsequent authenticated requests automatically include this cookie, so there is no need to manually send an Authorization header.
+
+        ## Response Format
+        Every response (success or error) follows the same envelope: `success`, `statusCode`, `message` and `data` (or `errors` on failure).
+
+    contact:
+        name: Rupesh Choudhary
+        email: rupevilary1010@gmail.com
+
+servers:
+    - url: http://localhost:8000/api/v1
+      description: Local Development Server
+    - url: https://your-render-url.onrender.com/api/v1
+      description: Production Server
+
+externalDocs:
+    description: WaitLess GitHub Repository
+    url: https://github.com/rupeshchy10/waitless_backend
+
+security:
+    - CookieAuth: []
+
+tags:
+    - name: Health
+      description: Health check and system status endpoints.
+    - name: User & Authentication
+      description: Registration, login and user profile management.
+    - name: Service Center
+      description: Create and manage service centers.
+    - name: Staff Assignment
+      description: Assign staff members to service centers.
+    - name: Queue
+      description: Join, manage and monitor queues.
+    - name: Notification
+      description: Manage user notifications.
+
+paths:
+    /:
+        get:
+            tags: [Health]
+            summary: API Information
+            description: Returns basic information about the WaitLess API (version, status, docs link). Publicly accessible.
+            security: []
+            responses:
+                "200":
+                    description: API information returned successfully.
+                    content:
+                        application/json:
+                            example:
+                                name: WaitLess
+                                version: 1.0.0
+                                status: Running
+                                message: API information returned successfully
+                                documentation: http://localhost:8000/reference,
+                                health: http://localhost:8000/api/v1/health
+
+    /health:
+        get:
+            tags: [Health]
+            summary: Health Check
+            description: Checks whether the API is running. Useful for uptime monitors and deployment platforms.
+            security: []
+            responses:
+                "200":
+                    description: API is running successfully.
+                    content:
+                        application/json:
+                            example:
+                                status: ok
+                                message: WaitLess API is running
+                                timestamp: 2026-07-18T12:45:00.000Z
+
+# --------------------------------------------------------
+# User & Authentication
+# --------------------------------------------------------
+    /user/register:
+        post:
+            tags: [User & Authentication]
+            summary: Register a new User
+            description: Creates a new user account with the default role `USER` and logs them in via an HttpOnly JWT cookie.
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/RegisterRequest"
+            responses:
+                "201":
+                    description: User registered successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: object
+                                              properties:
+                                                  user:
+                                                      $ref: "#/components/schemas/User"
+                                                  token:
+                                                      type: string
+                                                      description: JWT (also set as an HttpOnly cookie).
+                "400":
+                    $ref: "#/components/responses/ValidationError"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /user/login:
+        post:
+            tags: [User & Authentication]
+            summary: Login
+            description: Authenticates a user with email and password and returns an HttpOnly JWT cookie.
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/LoginRequest"
+            responses:
+                "200":
+                    description: User logged in  successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: object
+                                              properties:
+                                                  user:
+                                                      $ref: "#/components/schemas/User"
+                                                  token:
+                                                      type: string
+                "400":
+                    $ref: "#/components/responses/ValidationError"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /user/profile:
+        get:
+            tags: [User & Authentication]
+            summary: Get own profile
+            description: Returns the profile of the currently authenticated user.
+            responses:
+                "200":
+                    description: Current user fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/User"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /user/all-lists:
+        get:
+            tags: [User & Authentication]
+            summary: Get all users
+            description: "Returns every user. Roles allowed: ADMIN, STAFF."
+            responses:
+                "200":
+                    description: Users fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: array
+                                              items:
+                                                  $ref: "#/components/schemas/User"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /user/info/{id}:
+        get:
+            tags: [User & Authentication]
+            summary: Get user by ID
+            description: "Returns a single user by ID. Roles allowed: ADMIN, STAFF."
+            parameters:
+                - $ref: "#/components/parameters/UserId"
+            responses:
+                "200":
+                    description: User fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/User"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /user/logout:
+        post:
+            tags: [User & Authentication]
+            summary: Logout
+            description: Clears the `jwt` authentication cookie.
+            responses:
+                "200":
+                    description: Logged out successfully.
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+    /user/update/{id}:
+        put:
+            tags: [User & Authentication]
+            summary: Update user
+            description: Updates a user's profile fields. Only the fields provided are updated.
+            parameters:
+                - $ref: "#/components/parameters/UserId"
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UpdateUserRequest"
+            responses:
+                "200":
+                    description: User updated successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/User"
+                "400":
+                    $ref: "#/components/responses/ValidationError"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /user/delete/{id}:
+        delete:
+            tags: [User & Authentication]
+            summary: Delete user
+            parameters:
+                - $ref: "#/components/parameters/UserId"
+            responses:
+                "200":
+                    description: User deleted successfully.
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+# ----------------------------------------------
+# QUEUE
+# ----------------------------------------------
+    /queue/join/{serviceCenterId}:
+        post:
+            tags: [Queue]
+            summary: Join a queue
+            description: |
+                Joins the queue of the given service center. A sequential token number is generated and the queue entry expires automatically at the service center's closing time. Role allowed: USER.
+            parameters:
+                - $ref: "#/components/parameters/ServiceCenterId"
+            responses:
+                "201":
+                    description: Queue joined successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/QueueTicket"
+                "400":
+                    description: Service center is closed for the day.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    description: User already joined this service center's queue today.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+
+    /queue/my-queue:
+        get:
+            tags: [Queue]
+            summary: Get my active queue(s)
+            description: "Returns the authenticated user's active (WAITING/SERVING) queue entries. Role allowed: USER."
+            responses:
+                "200":
+                    description: My queue fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: array
+                                              items:
+                                                  $ref: "#/components/schemas/Queue"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /queue/history:
+        get:
+            tags: [Queue]
+            summary: Get my queue history
+            description: "Returns the authenticated user's past (COMPLETED/CANCELLED/EXPIRED/NO_SHOW) queue entries. Role allowed: USER."
+            responses:
+                "200":
+                    description: Queue history fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: array
+                                              items:
+                                                  $ref: "#/components/schemas/Queue"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /queue/{queueId}:
+        get:
+            tags: [Queue]
+            summary: Get queue by ID
+            description: "Returns a single queue entry. Roles allowed: ADMIN (any), USER (own only), STAFF (only if assigned to that service center)."
+            parameters:
+                - $ref: "#/components/parameters/QueueId"
+            responses:
+                "200":
+                    description: Queue fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/Queue"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /queue/service-center/{serviceCenterId}:
+        get:
+            tags: [Queue]
+            summary: Get queue by service center
+            description: "Returns every queue entry for a service center. Roles allowed: ADMIN (any center), STAFF (only assigned center)."
+            parameters:
+                - $ref: "#/components/parameters/ServiceCenterId"
+            responses:
+                "200":
+                    description: Queue fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: object
+                                              properties:
+                                                  serviceCenter:
+                                                      $ref: "#/components/schemas/ServiceCenterSummary"
+                                                  totalQueues:
+                                                      type: integer
+                                                  queues:
+                                                      type: array
+                                                      items:
+                                                          $ref: "#/components/schemas/Queue"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /queue/:
+        get:
+            tags: [Queue]
+            summary: Get all queues
+            description: Returns every queue entry across every service center. Publicly accessible.
+            security: []
+            responses:
+                "200":
+                    description: Queue fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: array
+                                              items:
+                                                  $ref: "#/components/schemas/Queue"
+
+    /queue/checked-in:
+        patch:
+            tags: [Queue]
+            summary: Check in
+            description: "Marks the authenticated user's active queue entry as checked-in. Role allowed: USER."
+            responses:
+                "200":
+                    description: Checked in successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/Queue"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    description: No active waiting queue found.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+                "409":
+                    description: Already checked in.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+
+    /queue/checked-in/{serviceCenterId}:
+        get:
+            tags: [Queue]
+            summary: Get checked-in list
+            description: "Returns checked-in queue entries for a service center. Roles allowed: ADMIN, STAFF (only assigned center)."
+            parameters:
+                - $ref: "#/components/parameters/ServiceCenterId"
+            responses:
+                "200":
+                    description: Checked-in list fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: object
+                                              properties:
+                                                  serviceCenter:
+                                                      $ref: "#/components/schemas/ServiceCenterSummary"
+                                                  totalCheckedIn:
+                                                      type: integer
+                                                  checkedInQueues:
+                                                      type: array
+                                                      items:
+                                                          $ref: "#/components/schemas/Queue"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /queue/{queueId}/priority:
+        patch:
+            tags: [Queue]
+            summary: Update queue priority
+            description: |
+                Sets a queue entry's priority to VIP, EMERGENCY, or NORMAL. Only WAITING queues can be updated.
+                Roles allowed: ADMIN, STAFF (only assigned center).
+            parameters:
+                - $ref: "#/components/parameters/QueueId"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/QueuePriorityRequest"
+            responses:
+                "200":
+                    description: Queue priority updated successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/Queue"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    description: Queue already has the requested priority.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+
+    /queue/call-next/{serviceCenterId}:
+        patch:
+            tags: [Queue]
+            summary: Call next customer
+            description: |
+                Calls the next checked-in, waiting customer (highest priority, lowest token first) and marks them as SERVING.
+                Fails if someone is already being served. Roles allowed: ADMIN, STAFF (only assigned center).
+            parameters:
+                - $ref: "#/components/parameters/ServiceCenterId"
+            responses:
+                "200":
+                    description: Next user called successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/Queue"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    description: Service center not found, or no checked-in user is waiting.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+                "409":
+                    description: A customer is already being served.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+
+    /queue/complete/{serviceCenterId}:
+        patch:
+            tags: [Queue]
+            summary: Complete queue
+            description: "Marks the currently SERVING queue entry as COMPLETED. Roles allowed: ADMIN, STAFF (only assigned center)."
+            parameters:
+                - $ref: "#/components/parameters/ServiceCenterId"
+            responses:
+                "200":
+                    description: Queue completed successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/Queue"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /queue/no-show/{serviceCenterId}:
+        patch:
+            tags: [Queue]
+            summary: Mark no-show
+            description: "Marks the currently SERVING customer as NO_SHOW because they never arrived. Roles allowed: ADMIN, STAFF (only assigned center)."
+            parameters:
+                - $ref: "#/components/parameters/ServiceCenterId"
+            responses:
+                "200":
+                    description: User marked as no-show successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/Queue"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /queue/cancel/{queueId}:
+        patch:
+            tags: [Queue]
+            summary: Cancel queue
+            description: "Cancels a queue entry. Only the queue owner may cancel it. Role allowed: USER."
+            parameters:
+                - $ref: "#/components/parameters/QueueId"
+            responses:
+                "200":
+                    description: Queue cancelled successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/Queue"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /queue/position/{queueId}:
+        get:
+            tags: [Queue]
+            summary: Get queue position
+            description: "Returns the current position, people ahead, and estimated wait time for a queue entry. Roles allowed: USER, ADMIN, STAFF."
+            parameters:
+                - $ref: "#/components/parameters/QueueId"
+            responses:
+                "200":
+                    description: Queue position fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/QueuePosition"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /queue/display/{serviceCenterId}:
+        get:
+            tags: [Queue]
+            summary: Get live display data
+            description: Returns publicly viewable live queue data (now serving, next up, waiting/checked-in counts). Meant for a waiting-room display screen.
+            security: []
+            parameters:
+                - $ref: "#/components/parameters/ServiceCenterId"
+            responses:
+                "200":
+                    description: Queue display data fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/QueueDisplay"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /queue/stats/{serviceCenterId}:
+        get:
+            tags: [Queue]
+            summary: Get queue statistics
+            description: "Returns a breakdown of queue counts by status for a service center. Roles allowed: ADMIN, STAFF."
+            parameters:
+                - $ref: "#/components/parameters/ServiceCenterId"
+            responses:
+                "200":
+                    description: Queue statistics fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/QueueStats"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /queue/close-day/{serviceCenterId}:
+        patch:
+            tags: [Queue]
+            summary: Close day
+            description: |
+                Emergency-closes a service center for the day: WAITING entries are marked EXPIRED, the currently SERVING
+                entry is marked NO_SHOW, and affected users are notified. Roles allowed: ADMIN, STAFF (only assigned center).
+            parameters:
+                - $ref: "#/components/parameters/ServiceCenterId"
+            responses:
+                "200":
+                    description: Service center closed successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/CloseDayResult"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+# ---------------------------------------------------------------------
+# SERVICE CENTER
+# ---------------------------------------------------------------------
+    /service-centers/register:
+        post:
+            tags: [Service Center]
+            summary: Register a service center
+            description: "Creates a new service center owned by the authenticated user. Roles allowed: ADMIN, STAFF."
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ServiceCenterRegisterRequest"
+            responses:
+                "201":
+                    description: Service center created successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/ServiceCenter"
+                "400":
+                    $ref: "#/components/responses/ValidationError"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /service-centers:
+        get:
+            tags: [Service Center]
+            summary: Get all service centers
+            description: "Returns every service center, grouped by owner. Role allowed: ADMIN."
+            responses:
+                "200":
+                    description: Service centers fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: array
+                                              items:
+                                                  $ref: "#/components/schemas/ServiceCenterOwnerGroup"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /service-centers/my:
+        get:
+            tags: [Service Center]
+            summary: Get my service centers
+            description: "Returns the service centers owned by the authenticated user. Roles allowed: ADMIN, STAFF."
+            responses:
+                "200":
+                    description: My service centers fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/ServiceCenterOwnerGroup"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /service-centers/{id}:
+        get:
+            tags: [Service Center]
+            summary: Get service center by ID
+            description: "Roles allowed: ADMIN, STAFF."
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                  description: Service center ID.
+            responses:
+                "200":
+                    description: Service center fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/ServiceCenter"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+        put:
+            tags: [Service Center]
+            summary: Update service center
+            description: "Updates the given fields of a service center. Roles allowed: ADMIN, STAFF."
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                  description: Service center ID.
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ServiceCenterUpdateRequest"
+            responses:
+                "200":
+                    description: Service center updated successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/ServiceCenter"
+                "400":
+                    $ref: "#/components/responses/ValidationError"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+        delete:
+            tags: [Service Center]
+            summary: Delete service center
+            description: Deletes a service center. Any authenticated user can call this endpoint (no role restriction is currently enforced).
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                  description: Service center ID.
+            responses:
+                "200":
+                    description: Service center deleted successfully.
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+# ---------------------------------------------------------------------
+# STAFF ASSIGNMENT
+# ---------------------------------------------------------------------
+    /staff-assignment/assign:
+        post:
+            tags: [Staff Assignment]
+            summary: Assign staff to a service center
+            description: "Assigns a user with the STAFF role to a service center. Role allowed: ADMIN."
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/AssignStaffRequest"
+            responses:
+                "201":
+                    description: Staff assigned successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/StaffAssignment"
+                "400":
+                    $ref: "#/components/responses/BadRequest"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    $ref: "#/components/responses/Conflict"
+
+    /staff-assignment:
+        get:
+            tags: [Staff Assignment]
+            summary: Get all staff assignments (flat list)
+            description: "Returns every staff assignment as a flat list. Role allowed: ADMIN."
+            responses:
+                "200":
+                    description: Staff assignment list fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: array
+                                              items:
+                                                  $ref: "#/components/schemas/StaffAssignment"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /staff-assignment/all-staffs:
+        get:
+            tags: [Staff Assignment]
+            summary: Get all staff grouped by service center
+            description: "Role allowed: ADMIN."
+            responses:
+                "200":
+                    description: Staff assignments fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: array
+                                              items:
+                                                  $ref: "#/components/schemas/StaffByServiceCenter"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /staff-assignment/all-service-centers:
+        get:
+            tags: [Staff Assignment]
+            summary: Get all service centers grouped by staff
+            description: "Role allowed: ADMIN."
+            responses:
+                "200":
+                    description: Service centers fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: array
+                                              items:
+                                                  $ref: "#/components/schemas/ServiceCentersByStaff"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+
+    /staff-assignment/staffs/{serviceCenterId}:
+        get:
+            tags: [Staff Assignment]
+            summary: Get staff assigned to a service center
+            description: "Roles allowed: ADMIN, STAFF (only assigned center)."
+            parameters:
+                - $ref: "#/components/parameters/ServiceCenterId"
+            responses:
+                "200":
+                    description: Staffs fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/StaffByServiceCenter"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /staff-assignment/service-centers/{userId}:
+        get:
+            tags: [Staff Assignment]
+            summary: Get service centers assigned to a staff member
+            description: "Roles allowed: ADMIN, STAFF (staff may only view their own assignments)."
+            parameters:
+                - name: userId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                  description: ID of the staff member.
+            responses:
+                "200":
+                    description: Service centers fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/ServiceCentersByStaff"
+                "400":
+                    description: The given user is not a staff member.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /staff-assignment/{id}:
+        delete:
+            tags: [Staff Assignment]
+            summary: Remove staff assignment
+            description: "Role allowed: ADMIN."
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                      format: uuid
+                  description: Staff assignment ID.
+            responses:
+                "200":
+                    description: Staff assignment removed successfully.
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "403":
+                    $ref: "#/components/responses/Forbidden"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+# ---------------------------------------------------------------------
+# NOTIFICATION
+# ---------------------------------------------------------------------
+    /notification:
+        get:
+            tags: [Notification]
+            summary: Get my notifications
+            responses:
+                "200":
+                    description: Notifications fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: object
+                                              properties:
+                                                  unreadCount:
+                                                      type: integer
+                                                  totalNotifications:
+                                                      type: integer
+                                                  notifications:
+                                                      type: array
+                                                      items:
+                                                          $ref: "#/components/schemas/Notification"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+
+        delete:
+            tags: [Notification]
+            summary: Delete all notifications
+            responses:
+                "200":
+                    description: All notifications deleted successfully.
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    description: No notifications found.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+
+    /notification/{notificationId}:
+        get:
+            tags: [Notification]
+            summary: Get notification by ID
+            description: A user can only read their own notifications.
+            parameters:
+                - $ref: "#/components/parameters/NotificationId"
+            responses:
+                "200":
+                    description: Notification fetched successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/Notification"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+        delete:
+            tags: [Notification]
+            summary: Delete notification
+            parameters:
+                - $ref: "#/components/parameters/NotificationId"
+            responses:
+                "200":
+                    description: Notification deleted successfully.
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+
+    /notification/read/{notificationId}:
+        patch:
+            tags: [Notification]
+            summary: Mark notification as read
+            parameters:
+                - $ref: "#/components/parameters/NotificationId"
+            responses:
+                "200":
+                    description: Notification marked as read successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              $ref: "#/components/schemas/Notification"
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    $ref: "#/components/responses/NotFound"
+                "409":
+                    description: Notification is already marked as read.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+
+    /notification/read-all:
+        patch:
+            tags: [Notification]
+            summary: Mark all notifications as read
+            responses:
+                "200":
+                    description: All notifications marked as read successfully.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - type: object
+                                      properties:
+                                          data:
+                                              type: object
+                                              properties:
+                                                  updatedCount:
+                                                      type: integer
+                "401":
+                    $ref: "#/components/responses/Unauthorized"
+                "404":
+                    description: No unread notifications found.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+
+components:
+    securitySchemes:
+        CookieAuth:
+            type: apiKey
+            in: cookie
+            name: jwt
+            description: HttpOnly JWT cookie set automatically after login/registration
+
+    parameters:
+        ServiceCenterId:
+            name: serviceCenterId
+            in: path
+            required: true
+            schema:
+                type: string
+                format: uuid
+            description: Service center ID.
+
+        QueueId:
+            name: queueId
+            in: path
+            required: true
+            schema:
+                type: string
+                format: uuid
+            description: Queue entry ID.
+
+        NotificationId:
+            name: notificationId
+            in: path
+            required: true
+            schema:
+                type: string
+                format: uuid
+            description: Notification ID.
+
+        UserId:
+            name: id
+            in: path
+            required: true
+            schema:
+                type: string
+                format: uuid
+            description: User ID.
+
+    responses:
+        BadRequest:
+            description: The request is invalid.
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/ApiError"
+
+        Unauthorized:
+            description: Authentication required or the JWT cookie is missing/invalid.
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/ApiError"
+
+        Forbidden:
+            description: You do not have permission to perform this action.
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/ApiError"
+
+        NotFound:
+            description: The requested resource was not found.
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/ApiError"
+
+        Conflict:
+            description: The resource already exists or conflicts with its current state.
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/ApiError"
+
+        ValidationError:
+            description: One or more fields failed validation.
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/ApiError"
+
+        InternalServerError:
+            description: Unexpected server error.
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/ApiError"
+
+    schemas:
+        ApiResponse:
+            type: object
+            properties:
+                success:
+                    type: boolean
+                    example: true
+                statusCode:
+                    type: integer
+                    example: 200
+                message:
+                    type: string
+                    example: Request completed successfully.
+                data:
+                    description: Endpoint-specific response data.
+                    nullable: true
+
+        ApiError:
+            type: object
+            properties:
+                success:
+                    type: boolean
+                    example: false
+                statusCode:
+                    type: integer
+                    example: 400
+                message:
+                    type: string
+                    example: Validation failed.
+                errors:
+                    type: array
+                    items:
+                        type: string
+                    example:
+                        - Email is required
+                        - Password must be at least 8 characters
+
+        # ---- User ----
+        RegisterRequest:
+            type: object
+            required: [fullName, email, password, phoneNumber, address]
+            properties:
+                fullName:
+                    type: string
+                    example: Reena Raz
+                email:
+                    type: string
+                    format: email
+                    example: reena@gmail.com
+                password:
+                    type: string
+                    format: password
+                    example: Reena1234
+                phoneNumber:
+                    type: string
+                    example: "+9779812345678"
+                address:
+                    type: string
+                    example: Biratnagar
+                profileImage:
+                    type: string
+                    nullable: true
+                    example: https://example.com/profile.jpg
+
+        LoginRequest:
+            type: object
+            required: [email, password]
+            properties:
+                email:
+                    type: string
+                    format: email
+                    example: reena@gmail.com
+                password:
+                    type: string
+                    format: password
+                    example: Reena1234
+
+        UpdateUserRequest:
+            type: object
+            description: All fields are optional; only provided fields are updated.
+            properties:
+                fullName:
+                    type: string
+                    example: Reena Magar
+                email:
+                    type: string
+                    format: email
+                    example: reena2@gmail.com
+                password:
+                    type: string
+                    format: password
+                    example: Reena1122
+                phoneNumber:
+                    type: string
+                    example: "+9779812123434"
+                address:
+                    type: string
+                    example: Ilam
+                profileImage:
+                    type: string
+                    nullable: true
+
+        User:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                fullName:
+                    type: string
+                    example: Reena Raz
+                email:
+                    type: string
+                    format: email
+                    example: reena@gmail.com
+                phoneNumber:
+                    type: string
+                    example: "+9779812345678"
+                address:
+                    type: string
+                    example: Biratnagar
+                role:
+                    type: string
+                    enum: [USER, STAFF, ADMIN]
+                profileImage:
+                    type: string
+                    nullable: true
+                    example: https://example.com/profile.jpg
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+
+        # ---- Service Center ----
+        ServiceCenterRegisterRequest:
+            type: object
+            required:
+                - name
+                - email
+                - phoneNumber
+                - address
+                - openingHour
+                - openingMinute
+                - closingHour
+                - closingMinute
+                - averageServiceTime
+            properties:
+                name:
+                    type: string
+                    example: Nirjal Service Center
+                email:
+                    type: string
+                    format: email
+                    example: center10@gmail.com
+                phoneNumber:
+                    type: string
+                    example: "+9779827305930"
+                address:
+                    type: string
+                    example: Biratnagar
+                logo:
+                    type: string
+                    nullable: true
+                openingHour:
+                    type: integer
+                    example: 10
+                openingMinute:
+                    type: integer
+                    example: 0
+                closingHour:
+                    type: integer
+                    example: 17
+                closingMinute:
+                    type: integer
+                    example: 0
+                averageServiceTime:
+                    type: integer
+                    description: Average time (in minutes) to serve one customer.
+                    example: 10
+
+        ServiceCenterUpdateRequest:
+            type: object
+            description: All fields are optional; only provided fields are updated.
+            properties:
+                name:
+                    type: string
+                email:
+                    type: string
+                    format: email
+                phoneNumber:
+                    type: string
+                address:
+                    type: string
+                logo:
+                    type: string
+                    nullable: true
+                openingHour:
+                    type: integer
+                openingMinute:
+                    type: integer
+                closingHour:
+                    type: integer
+                closingMinute:
+                    type: integer
+                averageServiceTime:
+                    type: integer
+
+        ServiceCenter:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                name:
+                    type: string
+                email:
+                    type: string
+                    format: email
+                phoneNumber:
+                    type: string
+                address:
+                    type: string
+                logo:
+                    type: string
+                    nullable: true
+                openingHour:
+                    type: integer
+                openingMinute:
+                    type: integer
+                closingHour:
+                    type: integer
+                closingMinute:
+                    type: integer
+                averageServiceTime:
+                    type: integer
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+                createdAtNepalTime:
+                    type: string
+                    description: createdAt formatted in Nepal time.
+                updatedAtNepalTime:
+                    type: string
+                    description: updatedAt formatted in Nepal time.
+
+        ServiceCenterSummary:
+            type: object
+            description: Minimal service center info embedded in queue-related responses.
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                name:
+                    type: string
+                address:
+                    type: string
+
+        ServiceCenterOwnerGroup:
+            type: object
+            description: A service center owner along with the centers they own.
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                fullName:
+                    type: string
+                email:
+                    type: string
+                role:
+                    type: string
+                    enum: [USER, STAFF, ADMIN]
+                serviceCenters:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ServiceCenter"
+
+        # ---- Staff Assignment ----
+        AssignStaffRequest:
+            type: object
+            required: [userId, serviceCenterId]
+            properties:
+                userId:
+                    type: string
+                    format: uuid
+                    description: ID of a user with the STAFF role.
+                    example: f1beb641-1c4a-41e4-9ff9-df5c6fb9f066
+                serviceCenterId:
+                    type: string
+                    format: uuid
+                    example: 22f05549-7763-42ad-8b6d-ffe8aaba741c
+
+        StaffAssignment:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                userId:
+                    type: string
+                    format: uuid
+                serviceCenterId:
+                    type: string
+                    format: uuid
+                user:
+                    type: object
+                    properties:
+                        id:
+                            type: string
+                            format: uuid
+                        fullName:
+                            type: string
+                        email:
+                            type: string
+                serviceCenter:
+                    type: object
+                    properties:
+                        id:
+                            type: string
+                            format: uuid
+                        name:
+                            type: string
+
+        StaffByServiceCenter:
+            type: object
+            properties:
+                serviceCenter:
+                    $ref: "#/components/schemas/ServiceCenterSummary"
+                totalStaffs:
+                    type: integer
+                staffs:
+                    type: array
+                    items:
+                        type: object
+                        properties:
+                            id:
+                                type: string
+                                format: uuid
+                            fullName:
+                                type: string
+                            email:
+                                type: string
+                            phoneNumber:
+                                type: string
+                            address:
+                                type: string
+                            role:
+                                type: string
+                                enum: [USER, STAFF, ADMIN]
+
+        ServiceCentersByStaff:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                fullName:
+                    type: string
+                email:
+                    type: string
+                phoneNumber:
+                    type: string
+                address:
+                    type: string
+                role:
+                    type: string
+                    enum: [USER, STAFF, ADMIN]
+                totalServiceCenters:
+                    type: integer
+                serviceCenters:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ServiceCenterSummary"
+
+        # ---- Queue ----
+        QueuePriorityRequest:
+            type: object
+            required: [priority]
+            properties:
+                priority:
+                    type: string
+                    enum: [NORMAL, VIP, EMERGENCY]
+                    example: VIP
+
+        Queue:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                userId:
+                    type: string
+                    format: uuid
+                serviceCenterId:
+                    type: string
+                    format: uuid
+                tokenNumber:
+                    type: integer
+                    example: 12
+                status:
+                    type: string
+                    enum:
+                        [
+                            WAITING,
+                            SERVING,
+                            COMPLETED,
+                            CANCELLED,
+                            EXPIRED,
+                            NO_SHOW,
+                        ]
+                priority:
+                    type: string
+                    enum: [NORMAL, VIP, EMERGENCY]
+                checkedIn:
+                    type: boolean
+                servedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                expiresAt:
+                    type: string
+                    format: date-time
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
+
+        QueueTicket:
+            type: object
+            description: The "digital ticket" returned right after joining a queue.
+            properties:
+                queueId:
+                    type: string
+                    format: uuid
+                tokenNumber:
+                    type: integer
+                position:
+                    type: integer
+                peopleAhead:
+                    type: integer
+                estimatedWaitMinutes:
+                    type: integer
+                priority:
+                    type: string
+                    enum: [NORMAL, VIP, EMERGENCY]
+                status:
+                    type: string
+                    enum:
+                        [
+                            WAITING,
+                            SERVING,
+                            COMPLETED,
+                            CANCELLED,
+                            EXPIRED,
+                            NO_SHOW,
+                        ]
+                serviceCenter:
+                    type: object
+                    properties:
+                        id:
+                            type: string
+                            format: uuid
+                        name:
+                            type: string
+                        openingHour:
+                            type: integer
+                        openingMinute:
+                            type: integer
+                        closingHour:
+                            type: integer
+                        closingMinute:
+                            type: integer
+                joinedAt:
+                    type: string
+                    format: date-time
+                expiresAt:
+                    type: string
+                    format: date-time
+
+        QueuePosition:
+            type: object
+            properties:
+                queueId:
+                    type: string
+                    format: uuid
+                serviceCenter:
+                    $ref: "#/components/schemas/ServiceCenterSummary"
+                status:
+                    type: string
+                    enum:
+                        [
+                            WAITING,
+                            SERVING,
+                            COMPLETED,
+                            CANCELLED,
+                            EXPIRED,
+                            NO_SHOW,
+                        ]
+                priority:
+                    type: string
+                    enum: [NORMAL, VIP, EMERGENCY]
+                currentToken:
+                    type: integer
+                    nullable: true
+                    description: Token currently being served, if any.
+                position:
+                    type: integer
+                peopleAhead:
+                    type: integer
+                estimatedWaitMinutes:
+                    type: integer
+
+        QueueDisplay:
+            type: object
+            properties:
+                serviceCenter:
+                    type: object
+                    properties:
+                        id:
+                            type: string
+                            format: uuid
+                        name:
+                            type: string
+                        address:
+                            type: string
+                        averageServiceTime:
+                            type: integer
+                nowServing:
+                    type: object
+                    nullable: true
+                    properties:
+                        tokenNumber:
+                            type: integer
+                        user:
+                            type: string
+                        priority:
+                            type: string
+                            enum: [NORMAL, VIP, EMERGENCY]
+                nextUser:
+                    type: object
+                    nullable: true
+                    properties:
+                        tokenNumber:
+                            type: integer
+                        user:
+                            type: string
+                        priority:
+                            type: string
+                            enum: [NORMAL, VIP, EMERGENCY]
+                waitingUsers:
+                    type: integer
+                checkedInUsers:
+                    type: integer
+                averageServiceTime:
+                    type: integer
+                estimatedTotalWaitMinutes:
+                    type: integer
+
+        QueueStats:
+            type: object
+            properties:
+                serviceCenter:
+                    type: object
+                    properties:
+                        id:
+                            type: string
+                            format: uuid
+                        name:
+                            type: string
+                totalQueues:
+                    type: integer
+                waiting:
+                    type: integer
+                serving:
+                    type: integer
+                completed:
+                    type: integer
+                cancelled:
+                    type: integer
+                expired:
+                    type: integer
+                noShow:
+                    type: integer
+
+        CloseDayResult:
+            type: object
+            properties:
+                serviceCenter:
+                    type: string
+                expiredQueues:
+                    type: integer
+                noShowQueues:
+                    type: integer
+                totalNotifications:
+                    type: integer
+                message:
+                    type: string
+                    example: Day closed successfully
+
+        # ---- Notification ----
+        Notification:
+            type: object
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                userId:
+                    type: string
+                    format: uuid
+                title:
+                    type: string
+                    example: Queue joined
+                message:
+                    type: string
+                    example: You joined Nirjal Service Center. Your token number is 12.
+                isRead:
+                    type: boolean
+                createdAt:
+                    type: string
+                    format: date-time
+                updatedAt:
+                    type: string
+                    format: date-time
