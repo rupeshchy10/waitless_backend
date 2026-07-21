@@ -737,7 +737,7 @@ const completeQueueService = async (serviceCenterId, currentUser) => {
     }
 
     // 4. Complete queue
-    const CompletedUser = await prisma.queue.update({
+    const completedUser = await prisma.queue.update({
         where: {
             id: servingUser.id,
         },
@@ -767,7 +767,7 @@ const completeQueueService = async (serviceCenterId, currentUser) => {
         message: `Your service at ${serviceCenter.name} has been completed. Thank you for using WaitLess.`,
     });
 
-    return formatOutput(CompletedUser);
+    return formatOutput(completedUser);
 };
 
 // 12. MARK NO_SHOW

@@ -1,6 +1,5 @@
-import { PrismaClient } from "../src/generated/prisma/client.js";
-
-const prisma = new PrismaClient();
+// import { PrismaClient } from "../generated/prisma/client.js"
+import { prisma } from "../utils/prisma.js";
 
 async function wakeDatabase() {
     console.log("Trying to wake Neon...");

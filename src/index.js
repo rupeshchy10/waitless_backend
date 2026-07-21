@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { connectDB, disconnectDB } from "./db/dbConnect.js";
 import { app } from "./app.js";
+import "./utils/queueExpiry.js";
 
 const port = process.env.PORT || 8000;
 
@@ -29,7 +30,9 @@ const startServer = async () => {
         await connectDB();
         server = app.listen(port, () => {
             console.log(`Server running on http://localhost:${port}/api/v1`);
-            console.log(`Docs available at http://localhost:${port}/api/v1/reference`);
+            console.log(
+                `Docs available at http://localhost:${port}/api/v1/reference`
+            );
         });
     } catch (error) {
         console.error("Server startup failed:", error);

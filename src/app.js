@@ -23,7 +23,7 @@ app.use(cookieParser());
 // STATIC FILES
 app.use(express.static("public"));
 
-// SCALAR MIDDLEWARE
+// SCALAR MIDDLEWARE 
 app.use("/api/v1/reference", (req, res, next) => {
     try {
         // 1. Resolve the absolute workspace location of the API specification file
