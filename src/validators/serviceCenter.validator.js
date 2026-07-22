@@ -1,4 +1,5 @@
 import { ApiError } from "../utils/ApiError.js";
+import { parseClosedDays } from "../utils/closedDays.js";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^\+[1-9]\d{7,14}$/;
@@ -9,6 +10,7 @@ const validateServiceCenterRegister = ({
     email,
     phoneNumber,
     address,
+    closedDays,
 }) => {
     if (!name?.trim()) {
         throw new ApiError(400, "Name is required");
@@ -40,10 +42,18 @@ const validateServiceCenterRegister = ({
     if (!address?.trim()) {
         throw new ApiError(400, "Address is required");
     }
+
+    parseClosedDays(closedDays);
 };
 
 // SERVICE CENTER UPDATE VALIDATION
-const validateServiceCenterUpdate = ({ name, email, phoneNumber, address }) => {
+const validateServiceCenterUpdate = ({
+    name,
+    email,
+    phoneNumber,
+    address,
+    closedDays,
+}) => {
     if (name !== undefined) {
         if (!name.trim()) {
             throw new ApiError(400, "Name cannot be empty");
@@ -78,6 +88,8 @@ const validateServiceCenterUpdate = ({ name, email, phoneNumber, address }) => {
             throw new ApiError(400, "Address cannot be empty");
         }
     }
+
+    parseClosedDays(closedDays);
 };
 
-export {validateServiceCenterRegister,validateServiceCenterUpdate}
+export { validateServiceCenterRegister, validateServiceCenterUpdate };

@@ -2,6 +2,8 @@ import { ApiError } from "../utils/ApiError.js";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^\+[1-9]\d{7,14}$/;
+const otpRegex = /^\d{6}$/;
+const ROLES = ["USER", "STAFF", "ADMIN"];
 
 // USER REGISTER VALIDATION
 const validateUserRegister = ({
@@ -48,6 +50,10 @@ const validateUserRegister = ({
 
     if (!address?.trim()) {
         throw new ApiError(400, "Address is required");
+    }
+
+    if (role !== undefined && !ROLES.includes(role)) {
+        throw new ApiError(400, `Role must be one of: ${ROLES.join(", ")}`);
     }
 };
 
@@ -116,4 +122,48 @@ const validateUserUpdate = ({
     }
 };
 
-export { validateUserRegister, validateUserLogin, validateUserUpdate };
+// FORGOT PASSWORD VALIDATION
+const validateForgotPassword = ({ email }) => {
+    if (!email?.trim()) {
+        throw new ApiError(400, "Email is required");
+    }
+
+    if (!emailRegex.test(email.trim())) {
+        throw new ApiError(400, "Invalid email");
+    }
+};
+
+// RESET PASSWORD VALIDATION
+const validateResetPassword = ({ email, otp, newPassword }) => {
+    if (!email?.trim()) {
+        throw new ApiError(400, "Email is required");
+    }
+
+    if (!emailRegex.test(email.trim())) {
+        throw new ApiError(400, "Invalid email");
+    }
+
+    if (!otp?.trim()) {
+        throw new ApiError(400, "OTP is required");
+    }
+
+    if (!otpRegex.test(otp.trim())) {
+        throw new ApiError(400, "OTP must be a 6-digit code");
+    }
+
+    if (!newPassword?.trim()) {
+        throw new ApiError(400, "New password is required");
+    }
+
+    if (newPassword.length < 8) {
+        throw new ApiError(400, "New password must be at least 8 characters");
+    }
+};
+
+export {
+    validateUserRegister,
+    validateUserLogin,
+    validateUserUpdate,
+    validateForgotPassword,
+    validateResetPassword,
+};

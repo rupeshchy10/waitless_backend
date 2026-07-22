@@ -29,45 +29,62 @@ const assignStaffService = async ({ userId, serviceCenterId }) => {
         throw new ApiError(404, "Service center not found");
     }
 
-    // 4. Check duplicate assignment
-    const existingAssignment = await prisma.staffAssignment.findUnique({
-        where: {
-            userId_serviceCenterId: {
-                userId,
-                serviceCenterId,
-            },
-        },
-    });
-
-    if (existingAssignment) {
-        throw new ApiError(
-            409,
-            "Staff is already assigned to this service center"
-        );
-    }
-
-    // 5. Create assignment
-    const assignment = await prisma.staffAssignment.create({
-        data: {
-            userId,
-            serviceCenterId,
-        },
-        include: {
-            user: {
-                select: {
-                    id: true,
-                    fullName: true,
-                    email: true,
+    // 4. Check duplicate assignment and enforce counter cap
+    const assignment = await prisma.$transaction(
+        async (tx) => {
+            const existingAssignment = await tx.staffAssignment.findUnique({
+                where: {
+                    userId_serviceCenterId: {
+                        userId,
+                        serviceCenterId,
+                    },
                 },
-            },
-            serviceCenter: {
-                select: {
-                    id: true,
-                    name: true,
+            });
+
+            if (existingAssignment) {
+                throw new ApiError(
+                    409,
+                    "Staff is already assigned to this service center"
+                );
+            }
+
+            const currentStaffCount = await tx.staffAssignment.count({
+                where: { serviceCenterId },
+            });
+
+            if (currentStaffCount >= serviceCenter.counterNumber) {
+                throw new ApiError(
+                    409,
+                    `This service center has ${serviceCenter.counterNumber} counter(s) and is already fully staffed`
+                );
+            }
+
+            return tx.staffAssignment.create({
+                data: {
+                    userId,
+                    serviceCenterId,
                 },
-            },
+
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            fullName: true,
+                            email: true,
+                        },
+                    },
+                    serviceCenter: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                },
+            });
         },
-    });
+        { isolationLevel: "Serializable" }
+    );
+
     return assignment;
 };
 
@@ -254,8 +271,10 @@ const getServiceCentersByStaffService = async (userId, currentUser) => {
                     address: true,
                     email: true,
                     phoneNumber: true,
-                    openingTime: true,
-                    closingTime: true,
+                    openingHour: true,
+                    openingMinute: true,
+                    closingHour: true,
+                    closingMinute: true,
                     averageServiceTime: true,
                 },
             },
@@ -309,8 +328,10 @@ const getAllServiceCentersByStaffsService = async () => {
                             address: true,
                             email: true,
                             phoneNumber: true,
-                            openingTime: true,
-                            closingTime: true,
+                            openingHour: true,
+                            openingMinute: true,
+                            closingHour: true,
+                            closingMinute: true,
                             averageServiceTime: true,
                         },
                     },

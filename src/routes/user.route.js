@@ -8,27 +8,60 @@ import {
     getAllUsers,
     getUserById,
     logout,
+    forgotPassword,
+    resetPassword,
 } from "../controllers/user.controller.js";
 import {
     authMiddleware,
+    optionalAuth,
     authorizeRoles,
 } from "../middlewares/auth.middleware.js";
 import {
     validateUserRegister,
     validateUserLogin,
     validateUserUpdate,
+    validateForgotPassword,
+    validateResetPassword,
 } from "../validators/user.validator.js";
 import { validate } from "../middlewares/validate.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
 
-router.post("/register", validate(validateUserRegister), registerUser);
+router.post(
+    "/register",
+    optionalAuth,
+    upload.single("profileImage"),
+    validate(validateUserRegister),
+    registerUser
+);
 router.post("/login", validate(validateUserLogin), loginUser);
-router.get("/all-lists", authMiddleware, authorizeRoles("ADMIN", "STAFF"), getAllUsers);
+router.post(
+    "/forgot-password",
+    validate(validateForgotPassword),
+    forgotPassword
+);
+router.post(
+    "/reset-password",
+    validate(validateResetPassword),
+    resetPassword
+);
+router.get(
+    "/all-lists",
+    authMiddleware,
+    authorizeRoles("ADMIN", "STAFF"),
+    getAllUsers
+);
 router.get("/profile", authMiddleware, getOwnProfile);
 router.post("/logout", authMiddleware, logout);
 
-router.put("/update/:id", validate(validateUserUpdate), authMiddleware, updateUser);
+router.put(
+    "/update/:id",
+    upload.single("profileImage"),
+    validate(validateUserUpdate),
+    authMiddleware,
+    updateUser
+);
 router.delete("/delete/:id", authMiddleware, deleteUser);
 router.get(
     "/info/:id",

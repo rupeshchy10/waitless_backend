@@ -1,6 +1,7 @@
 import * as serviceCenterService from "../services/serviceCenter.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 // GET ALL SERVICE CENTERS
 const getAllServiceCenters = asyncHandler(async (req, res) => {
@@ -56,9 +57,24 @@ const getServiceCenterById = asyncHandler(async (req, res) => {
 // REGISTER SERVICE CENTER
 const registerServiceCenter = asyncHandler(async (req, res) => {
     const { id } = req.user;
-    const serviceCenter =
-        await serviceCenterService.registerServiceCenterService(id, req.body);
-
+ 
+    let uploadedLogo = null;
+    if (req.file) {
+        uploadedLogo = await uploadOnCloudinary(
+            req.file.path,
+            "waitless/service-centers"
+        );
+    }
+ 
+    const serviceCenter = await serviceCenterService.registerServiceCenterService(
+        id,
+        {
+            ...req.body,
+            logo: uploadedLogo?.url,
+            logoId: uploadedLogo?.publicId,
+        }
+    );
+ 
     return res
         .status(201)
         .json(
@@ -69,16 +85,30 @@ const registerServiceCenter = asyncHandler(async (req, res) => {
             )
         );
 });
-
+ 
 // UPDATE SERVICE CENTER
 const updateServiceCenter = asyncHandler(async (req, res) => {
     const { id } = req.params;
-
+ 
+    let uploadedLogo = null;
+    if (req.file) {
+        uploadedLogo = await uploadOnCloudinary(
+            req.file.path,
+            "waitless/service-centers"
+        );
+    }
+ 
     const serviceCenter = await serviceCenterService.updateServiceCenterService(
         id,
-        req.body
+        {
+            ...req.body,
+            ...(uploadedLogo && {
+                logo: uploadedLogo.url,
+                logoId: uploadedLogo.publicId,
+            }),
+        }
     );
-
+ 
     return res
         .status(200)
         .json(

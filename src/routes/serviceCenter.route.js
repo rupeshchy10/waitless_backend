@@ -16,22 +16,19 @@ import {
     authMiddleware,
     authorizeRoles,
 } from "../middlewares/auth.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
 
 router.post(
     "/register",
+    upload.single("logo"),
     validate(validateServiceCenterRegister),
     authMiddleware,
     authorizeRoles("ADMIN", "STAFF"),
     registerServiceCenter
 );
-router.get(
-    "/",
-    authMiddleware,
-    authorizeRoles("ADMIN"),
-    getAllServiceCenters
-);
+router.get("/", authMiddleware, authorizeRoles("ADMIN"), getAllServiceCenters);
 router.get(
     "/my",
     authMiddleware,
@@ -46,6 +43,7 @@ router.get(
 );
 router.put(
     "/:id",
+    upload.single("logo"),
     validate(validateServiceCenterUpdate),
     authMiddleware,
     authorizeRoles("ADMIN", "STAFF"),

@@ -2,6 +2,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import * as userService from "../services/user.service.js";
 import { generateToken } from "../utils/generateToken.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 // GET ALL USERS
 const getAllUsers = asyncHandler(async (req, res) => {
@@ -36,9 +37,24 @@ const getOwnProfile = asyncHandler(async (req, res) => {
 
 // CREATE/REGISTER USER
 const registerUser = asyncHandler(async (req, res) => {
-    // validateRegister(req.body);
+    let uploadedImage = null;
+    if (req.file) {
+        uploadedImage = await uploadOnCloudinary(
+            req.file.path,
+            "WaitLess/users"
+        );
+    }
 
-    const user = await userService.registerUserService(req.body);
+    const requestedRole = req.body.role;
+    const isAdminCaller = req.user?.role === "ADMIN";
+    const resolvedRole = isAdminCaller ? requestedRole : undefined;
+
+    const user = await userService.registerUserService({
+        ...req.body,
+        role: resolvedRole,
+        profileImage: uploadedImage?.url,
+        profileImageId: uploadedImage?.publicId,
+    });
 
     const token = generateToken(user.id, res);
 
@@ -56,8 +72,6 @@ const registerUser = asyncHandler(async (req, res) => {
 
 // LOGIN USER
 const loginUser = asyncHandler(async (req, res) => {
-    // validateLogin(req.body);
-
     const user = await userService.loginUserService(req.body);
 
     const token = generateToken(user.id, res);
@@ -78,9 +92,21 @@ const loginUser = asyncHandler(async (req, res) => {
 const updateUser = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
-    // validateUpdate(req.body);
+    let uploadedImage = null;
+    if (req.file) {
+        uploadedImage = await uploadOnCloudinary(
+            req.file.path,
+            "WaitLess/users"
+        );
+    }
 
-    const user = await userService.updateUserService(id, req.body);
+    const user = await userService.updateUserService(id, {
+        ...req.body,
+        ...(uploadedImage && {
+            profileImage: uploadedImage.url,
+            profileImageId: uploadedImage.publicId,
+        }),
+    });
 
     return res
         .status(200)
@@ -109,6 +135,35 @@ const logout = asyncHandler(async (req, res) => {
     res.status(200).json(new ApiResponse(200, null, "Logged out successfully"));
 });
 
+// FORGOT PASSWORD — request an OTP
+const forgotPassword = asyncHandler(async (req, res) => {
+    const { email } = req.body;
+ 
+    await userService.forgotPasswordService(email);
+ 
+    
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                null,
+                "If an account exists for this email, a reset code has been sent."
+            )
+        );
+});
+ 
+// RESET PASSWORD — verify the OTP and set a new password
+const resetPassword = asyncHandler(async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+ 
+    await userService.resetPasswordService({ email, otp, newPassword });
+ 
+    return res
+        .status(200)
+        .json(new ApiResponse(200, null, "Password reset successfully"));
+});
+
 export {
     getAllUsers,
     getUserById,
@@ -118,4 +173,6 @@ export {
     updateUser,
     deleteUser,
     logout,
+    forgotPassword,
+    resetPassword
 };

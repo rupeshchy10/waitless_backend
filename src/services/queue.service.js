@@ -19,7 +19,21 @@ const safeServiceCenterSelect = {
     closingHour: true,
     closingMinute: true,
     averageServiceTime: true,
+    closedDays: true,
 };
+
+const DAY_NAMES = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+];
+
+// Times to retry token assignment if two joins race each other.
+const MAX_JOIN_RETRIES = 5;
 
 // 1. JOIN QUEUE
 const joinQueueEntryService = async (userId, serviceCenterId) => {
@@ -38,6 +52,15 @@ const joinQueueEntryService = async (userId, serviceCenterId) => {
 
     if (!serviceCenter) {
         throw new ApiError(404, "Service center not found");
+    }
+
+    const todayDayOfWeek = new Date().getDay(); // 0 = Sunday ... 6 = Saturday
+
+    if (serviceCenter.closedDays.includes(todayDayOfWeek)) {
+        throw new ApiError(
+            400,
+            `${serviceCenter.name} is closed on ${DAY_NAMES[todayDayOfWeek]}s. Please try again on the next open day.`
+        );
     }
 
     // 3. Current time
@@ -86,42 +109,57 @@ const joinQueueEntryService = async (userId, serviceCenterId) => {
     }
 
     // 7. Transaction
-    const queueEntry = await prisma.$transaction(async (tx) => {
-        const lastToken = await tx.queue.findFirst({
-            where: {
-                serviceCenterId,
+    let queueEntry;
 
-                createdAt: {
-                    gte: startOfDay,
-                    lte: endOfDay,
-                },
-            },
+    for (let attempt = 1; attempt <= MAX_JOIN_RETRIES; attempt++) {
+        try {
+            queueEntry = await prisma.$transaction(async (tx) => {
+                const lastToken = await tx.queue.findFirst({
+                    where: {
+                        serviceCenterId,
 
-            orderBy: {
-                tokenNumber: "desc",
-            },
-        });
+                        createdAt: {
+                            gte: startOfDay,
+                            lte: endOfDay,
+                        },
+                    },
 
-        const nextToken = lastToken ? lastToken.tokenNumber + 1 : 1;
+                    orderBy: {
+                        tokenNumber: "desc",
+                    },
+                });
 
-        // expires today at closing time
-        const expiresAt = new Date(now);
-        expiresAt.setHours(
-            serviceCenter.closingHour,
-            serviceCenter.closingMinute,
-            0,
-            0
-        );
+                const nextToken = lastToken ? lastToken.tokenNumber + 1 : 1;
 
-        return tx.queue.create({
-            data: {
-                userId,
-                serviceCenterId,
-                tokenNumber: nextToken,
-                expiresAt,
-            },
-        });
-    });
+                // expires today at closing time
+                const expiresAt = new Date(now);
+                expiresAt.setHours(
+                    serviceCenter.closingHour,
+                    serviceCenter.closingMinute,
+                    0,
+                    0
+                );
+
+                return tx.queue.create({
+                    data: {
+                        userId,
+                        serviceCenterId,
+                        tokenNumber: nextToken,
+                        expiresAt,
+                    },
+                });
+            });
+
+            break; // success - no need to retry further
+        } catch (error) {
+            const isTokenCollision = error.code === "P2002";
+            const isLastAttempt = attempt === MAX_JOIN_RETRIES;
+
+            if (!isTokenCollision || isLastAttempt) {
+                throw error;
+            }
+        }
+    }
 
     // 8. People ahead
     const peopleAhead = await prisma.queue.count({
@@ -986,6 +1024,7 @@ const getDisplayQueueDataService = async (serviceCenterId) => {
             name: true,
             address: true,
             averageServiceTime: true,
+            closedDays: true,
         },
     });
 
@@ -1053,6 +1092,7 @@ const getDisplayQueueDataService = async (serviceCenterId) => {
 
     return {
         serviceCenter,
+        isClosedToday: serviceCenter.closedDays.includes(new Date().getDay()),
         nowServing: nowServing
             ? {
                   tokenNumber: nowServing.tokenNumber,

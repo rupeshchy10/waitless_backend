@@ -50,6 +50,43 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     next();
 });
 
+// OPTIONAL AUTH — for endpoints that are public by default but behave differently when an authenticated admin calls them
+const optionalAuth = asyncHandler(async (req, res, next) => {
+    let token = req.cookies?.jwt;
+
+    const authHeader = req.headers.authorization;
+    if (!token && authHeader?.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1];
+    }
+
+    if (!token) {
+        return next();
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.id },
+            select: {
+                id: true,
+                fullName: true,
+                email: true,
+                role: true,
+            },
+        });
+
+        if (user) {
+            req.user = user;
+        }
+    } catch (error) {
+        // Swallow it — an invalid/expired token on an optional-auth route
+        // just means "treat this as an anonymous request", not an error.
+    }
+
+    next();
+});
+
 const authorizeRoles = (...roles) => {
     return (req, res, next) => {
         if (!req.user) {
@@ -64,4 +101,4 @@ const authorizeRoles = (...roles) => {
     };
 };
 
-export { authMiddleware, authorizeRoles };
+export { authMiddleware, optionalAuth, authorizeRoles };

@@ -1,5 +1,5 @@
 export const errorMiddleware = (err, req, res, next) => {
-    const statusCode = err.statusCode || 500;
+    const statusCode = err.name === "MulterError" ? 400 : err.statusCode || 500;
 
     console.error("Error:", err.stack);
 

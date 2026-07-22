@@ -1,6 +1,8 @@
 import { prisma } from "../utils/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
 import { formatNepalTime } from "../utils/time.js";
+import { deleteFromCloudinary } from "../utils/cloudinary.js";
+import { parseClosedDays } from "../utils/closedDays.js";
 
 const safeServiceCenterSelect = {
     id: true,
@@ -14,6 +16,7 @@ const safeServiceCenterSelect = {
     closingHour: true,
     closingMinute: true,
     averageServiceTime: true,
+    closedDays: true,
     createdAt: true,
     updatedAt: true,
 };
@@ -111,11 +114,13 @@ const registerServiceCenterService = async (
         phoneNumber,
         address,
         logo,
+        logoId,
         openingHour,
         openingMinute,
         closingHour,
         closingMinute,
         averageServiceTime,
+        closedDays,
     }
 ) => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -137,11 +142,13 @@ const registerServiceCenterService = async (
             phoneNumber: phoneNumber.trim(),
             address: address.trim(),
             logo,
+            logoId,
             openingHour,
             openingMinute,
             closingHour,
             closingMinute,
             averageServiceTime,
+            closedDays: parseClosedDays(closedDays),
         },
     });
 
@@ -161,11 +168,13 @@ const updateServiceCenterService = async (
         phoneNumber,
         address,
         logo,
+        logoId,
         openingHour,
         openingMinute,
         closingHour,
         closingMinute,
         averageServiceTime,
+        closedDays,
     }
 ) => {
     const serviceCenter = await prisma.serviceCenter.findUnique({
@@ -213,6 +222,7 @@ const updateServiceCenterService = async (
 
     if (logo !== undefined) {
         updateData.logo = logo;
+        updateData.logoId = logoId;
     }
     if (openingHour !== undefined) {
         updateData.openingHour = openingHour;
@@ -229,11 +239,19 @@ const updateServiceCenterService = async (
     if (averageServiceTime !== undefined) {
         updateData.averageServiceTime = averageServiceTime;
     }
+    if (closedDays !== undefined) {
+        updateData.closedDays = parseClosedDays(closedDays);
+    }
 
     const updatedServiceCenter = await prisma.serviceCenter.update({
         where: { id },
         data: updateData,
     });
+
+    // Remove old logo as new one is saved successfully
+    if (logo !== undefined && serviceCenter.logoId) {
+        await deleteFromCloudinary(serviceCenter.logoId);
+    }
 
     return {
         ...updatedServiceCenter,
@@ -255,6 +273,10 @@ const deleteServiceCenterService = async (id) => {
     await prisma.serviceCenter.delete({
         where: { id },
     });
+
+    if (existingServiceCenter.logoId) {
+        await deleteFromCloudinary(existingServiceCenter.logoId);
+    }
 
     return true;
 };

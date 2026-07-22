@@ -41,6 +41,9 @@ model User {
 
     role Role @default(USER)
 
+    passwordResetOtpHash      String?
+    passwordResetOtpExpiresAt DateTime?
+
     queues           Queue[]
     notifications    Notification[]
     staffAssignments StaffAssignment[]
@@ -74,6 +77,8 @@ model ServiceCenter {
     closingMinute Int @default(0)
 
     averageServiceTime Int @default(10)
+
+    closedDays Int[] @default([])
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
