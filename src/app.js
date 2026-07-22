@@ -61,7 +61,7 @@ app.get("/api/v1", (req, res) => {
         version: "1.0.0",
         status: "Running",
         message: "API information returned successfully",
-        documentation: `${baseUrl}/reference`,
+        documentation: `${baseUrl}/api/v1/reference`,
         health: `${baseUrl}/api/v1/health`,
     });
 });
