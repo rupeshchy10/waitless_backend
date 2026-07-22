@@ -49,7 +49,7 @@ app.use("/api/v1/reference", (req, res, next) => {
 
 //  HOME ROUTE
 app.get("/", (req, res) => {
-    res.redirect("/api/v1");
+    res.redirect("/api/v1/reference");
 });
 
 // Root Endpoint
