@@ -9,12 +9,13 @@ info:
 
         ## Features
         - JWT Cookie Authentication
-        - Role-Based Access Control (Admin, Staff & User)
-        - Queue Management (join, check-in, call next, priority, stats)
-        - Service Center Management
+        - Role-Based Access Control (Admin, Staff & User), including admin-controlled STAFF/ADMIN account creation
+        - Queue Management (join, check-in, call next, priority, stats), with automatic closing-time expiry via a scheduled job
+        - Service Center Management, including weekly off-days and a counter-capped limit on assigned staff
         - Staff assignment to service centers
         - Notification System
-        - Queue Analytics
+        - Forgot/reset password via emailed OTP
+        - Cloudinary-backed image uploads for profile pictures and service center logos
         - Nepal time formatted timestamps
 
         ## Technology Stack
@@ -79,7 +80,7 @@ paths:
                                 version: 1.0.0
                                 status: Running
                                 message: API information returned successfully
-                                documentation: http://localhost:8000/reference,
+                                documentation: http://localhost:8000/api/v1/reference
                                 health: http://localhost:8000/api/v1/health
 
     /health:
@@ -98,19 +99,28 @@ paths:
                                 message: WaitLess API is running
                                 timestamp: 2026-07-18T12:45:00.000Z
 
-# --------------------------------------------------------
-# User & Authentication
-# --------------------------------------------------------
+    # --------------------------------------------------------
+    # User & Authentication
+    # --------------------------------------------------------
     /user/register:
         post:
             tags: [User & Authentication]
-            summary: Register a new User
-            description: Creates a new user account with the default role `USER` and logs them in via an HttpOnly JWT cookie.
+            summary: Register a new user
+            description: |
+                Creates a new user account and logs them in via an HttpOnly JWT cookie.
+
+                Public by default — self-registration always creates a `USER`, regardless of what `role` is
+                sent. If (and only if) this endpoint is called by an already-authenticated `ADMIN` (i.e. a
+                valid `jwt` cookie for an admin is sent with the request), the `role` field is honored,
+                allowing an admin to create `STAFF` or `ADMIN` accounts. Everyone else's `role` value is
+                silently ignored.
+
+                Accepts `multipart/form-data` so an optional `profileImage` file can be attached.
             security: []
             requestBody:
                 required: true
                 content:
-                    application/json:
+                    multipart/form-data:
                         schema:
                             $ref: "#/components/schemas/RegisterRequest"
             responses:
@@ -260,7 +270,7 @@ paths:
                 - $ref: "#/components/parameters/UserId"
             requestBody:
                 content:
-                    application/json:
+                    multipart/form-data:
                         schema:
                             $ref: "#/components/schemas/UpdateUserRequest"
             responses:
@@ -298,15 +308,68 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
-# ----------------------------------------------
-# QUEUE
-# ----------------------------------------------
+    /user/forgot-password:
+        post:
+            tags: [User & Authentication]
+            summary: Request a password reset OTP
+            description: |
+                Sends a 6-digit OTP to the account's email if it exists, valid for 10 minutes. Always returns
+                the same generic success message whether or not the email is registered, to prevent an
+                attacker from using this endpoint to discover which emails have accounts.
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ForgotPasswordRequest"
+            responses:
+                "200":
+                    description: Generic confirmation — sent regardless of whether the email exists.
+                    content:
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: "#/components/schemas/ApiResponse"
+                                    - example:
+                                          message: If an account exists for this email, a reset code has been sent.
+                "400":
+                    $ref: "#/components/responses/ValidationError"
+
+    /user/reset-password:
+        post:
+            tags: [User & Authentication]
+            summary: Reset password using the OTP
+            description: |
+                Verifies the 6-digit OTP sent to the account's email and, if valid and not expired, sets the
+                new password. The OTP is single-use — it's cleared immediately on success, even if still
+                within its 10-minute window.
+            security: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ResetPasswordRequest"
+            responses:
+                "200":
+                    description: Password reset successfully.
+                "400":
+                    description: Invalid or expired OTP, or a validation error. The same generic message is used for "wrong OTP", "expired OTP", and "no OTP requested", to avoid giving an attacker feedback while guessing the code.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiError"
+
+    # ----------------------------------------------
+    # QUEUE
+    # ----------------------------------------------
     /queue/join/{serviceCenterId}:
         post:
             tags: [Queue]
             summary: Join a queue
             description: |
-                Joins the queue of the given service center. A sequential token number is generated and the queue entry expires automatically at the service center's closing time. Role allowed: USER.
+                Joins the queue of the given service center. A sequential token number is generated and the queue entry expires automatically at the service center's closing time. Joining is blocked if today is one of the service center's configured weekly off-days, or if it's already past closing time. Role allowed: USER.
             parameters:
                 - $ref: "#/components/parameters/ServiceCenterId"
             responses:
@@ -322,7 +385,7 @@ paths:
                                           data:
                                               $ref: "#/components/schemas/QueueTicket"
                 "400":
-                    description: Service center is closed for the day.
+                    description: Service center is closed for the day (past closing time, or a configured weekly off-day).
                     content:
                         application/json:
                             schema:
@@ -800,18 +863,18 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
-# ---------------------------------------------------------------------
-# SERVICE CENTER
-# ---------------------------------------------------------------------
+    # ---------------------------------------------------------------------
+    # SERVICE CENTER
+    # ---------------------------------------------------------------------
     /service-centers/register:
         post:
             tags: [Service Center]
             summary: Register a service center
-            description: "Creates a new service center owned by the authenticated user. Roles allowed: ADMIN, STAFF."
+            description: "Creates a new service center owned by the authenticated user. Accepts multipart/form-data for an optional logo upload. Roles allowed: ADMIN, STAFF."
             requestBody:
                 required: true
                 content:
-                    application/json:
+                    multipart/form-data:
                         schema:
                             $ref: "#/components/schemas/ServiceCenterRegisterRequest"
             responses:
@@ -927,7 +990,7 @@ paths:
                   description: Service center ID.
             requestBody:
                 content:
-                    application/json:
+                    multipart/form-data:
                         schema:
                             $ref: "#/components/schemas/ServiceCenterUpdateRequest"
             responses:
@@ -973,14 +1036,17 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
-# ---------------------------------------------------------------------
-# STAFF ASSIGNMENT
-# ---------------------------------------------------------------------
+    # ---------------------------------------------------------------------
+    # STAFF ASSIGNMENT
+    # ---------------------------------------------------------------------
     /staff-assignment/assign:
         post:
             tags: [Staff Assignment]
             summary: Assign staff to a service center
-            description: "Assigns a user with the STAFF role to a service center. Role allowed: ADMIN."
+            description: |
+                Assigns a user with the STAFF role to a service center. Rejected with a 409 if the service
+                center is already assigned as many staff as its configured `counterNumber` (one staff per
+                physical counter). Role allowed: ADMIN.
             requestBody:
                 required: true
                 content:
@@ -1169,9 +1235,9 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
-# ---------------------------------------------------------------------
-# NOTIFICATION
-# ---------------------------------------------------------------------
+    # ---------------------------------------------------------------------
+    # NOTIFICATION
+    # ---------------------------------------------------------------------
     /notification:
         get:
             tags: [Notification]
@@ -1465,8 +1531,16 @@ components:
                     example: Biratnagar
                 profileImage:
                     type: string
-                    nullable: true
-                    example: https://example.com/profile.jpg
+                    format: binary
+                    description: Optional profile image file (jpg, png, or webp; max 5MB).
+                role:
+                    type: string
+                    enum: [USER, STAFF, ADMIN]
+                    description: |
+                        Only honored when this request is made by an authenticated ADMIN. Ignored for
+                        everyone else — self-registration always results in a USER account regardless of
+                        what's sent here.
+                    example: STAFF
 
         LoginRequest:
             type: object
@@ -1480,6 +1554,32 @@ components:
                     type: string
                     format: password
                     example: Reena1234
+
+        ForgotPasswordRequest:
+            type: object
+            required: [email]
+            properties:
+                email:
+                    type: string
+                    format: email
+                    example: reena@gmail.com
+
+        ResetPasswordRequest:
+            type: object
+            required: [email, otp, newPassword]
+            properties:
+                email:
+                    type: string
+                    format: email
+                    example: reena@gmail.com
+                otp:
+                    type: string
+                    pattern: "^[0-9]{6}$"
+                    example: "482913"
+                newPassword:
+                    type: string
+                    format: password
+                    example: NewReena1234
 
         UpdateUserRequest:
             type: object
@@ -1504,7 +1604,8 @@ components:
                     example: Ilam
                 profileImage:
                     type: string
-                    nullable: true
+                    format: binary
+                    description: Optional replacement profile image file (jpg, png, or webp; max 5MB).
 
         User:
             type: object
@@ -1568,7 +1669,8 @@ components:
                     example: Biratnagar
                 logo:
                     type: string
-                    nullable: true
+                    format: binary
+                    description: Optional logo image file (jpg, png, or webp; max 5MB).
                 openingHour:
                     type: integer
                     example: 10
@@ -1585,6 +1687,18 @@ components:
                     type: integer
                     description: Average time (in minutes) to serve one customer.
                     example: 10
+                counterNumber:
+                    type: integer
+                    description: Number of physical counters at this center. Caps how many staff can be assigned to it. Defaults to 1 if omitted.
+                    example: 3
+                closedDays:
+                    type: array
+                    description: Weekly recurring off-days as day-of-week numbers (0=Sunday...6=Saturday). Omit for "open every day". Sent as a JSON-encoded string in this multipart request, e.g. "[0,6]".
+                    items:
+                        type: integer
+                        minimum: 0
+                        maximum: 6
+                    example: [6]
 
         ServiceCenterUpdateRequest:
             type: object
@@ -1601,7 +1715,8 @@ components:
                     type: string
                 logo:
                     type: string
-                    nullable: true
+                    format: binary
+                    description: Optional replacement logo image file (jpg, png, or webp; max 5MB).
                 openingHour:
                     type: integer
                 openingMinute:
@@ -1612,6 +1727,16 @@ components:
                     type: integer
                 averageServiceTime:
                     type: integer
+                counterNumber:
+                    type: integer
+                    description: Number of physical counters. Lowering this below the current assigned staff count does not remove existing assignments, but blocks new ones until it's back under the cap.
+                closedDays:
+                    type: array
+                    description: Weekly recurring off-days as day-of-week numbers (0=Sunday...6=Saturday). Sent as a JSON-encoded string in this multipart request, e.g. "[0,6]".
+                    items:
+                        type: integer
+                        minimum: 0
+                        maximum: 6
 
         ServiceCenter:
             type: object
@@ -1641,6 +1766,18 @@ components:
                     type: integer
                 averageServiceTime:
                     type: integer
+                counterNumber:
+                    type: integer
+                    description: Number of physical counters at this center. Caps how many staff can be assigned via POST /staff-assignment/assign.
+                    example: 3
+                closedDays:
+                    type: array
+                    description: Weekly recurring off-days as day-of-week numbers (0=Sunday...6=Saturday).
+                    items:
+                        type: integer
+                        minimum: 0
+                        maximum: 6
+                    example: [6]
                 createdAt:
                     type: string
                     format: date-time
@@ -1937,6 +2074,9 @@ components:
                             type: string
                         averageServiceTime:
                             type: integer
+                isClosedToday:
+                    type: boolean
+                    description: True if today is one of the service center's configured weekly off-days.
                 nowServing:
                     type: object
                     nullable: true

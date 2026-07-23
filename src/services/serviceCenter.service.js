@@ -4,6 +4,10 @@ import { formatNepalTime } from "../utils/time.js";
 import { deleteFromCloudinary } from "../utils/cloudinary.js";
 import { parseClosedDays } from "../utils/closedDays.js";
 
+// Numeric fields arrive as strings whenever the request is multipart/form-data
+const toNumber = (value) =>
+    typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+
 const safeServiceCenterSelect = {
     id: true,
     name: true,
@@ -16,6 +20,7 @@ const safeServiceCenterSelect = {
     closingHour: true,
     closingMinute: true,
     averageServiceTime: true,
+    counterNumber: true,
     closedDays: true,
     createdAt: true,
     updatedAt: true,
@@ -120,6 +125,7 @@ const registerServiceCenterService = async (
         closingHour,
         closingMinute,
         averageServiceTime,
+        counterNumber,
         closedDays,
     }
 ) => {
@@ -143,11 +149,12 @@ const registerServiceCenterService = async (
             address: address.trim(),
             logo,
             logoId,
-            openingHour,
-            openingMinute,
-            closingHour,
-            closingMinute,
-            averageServiceTime,
+            openingHour: toNumber(openingHour),
+            openingMinute: toNumber(openingMinute),
+            closingHour: toNumber(closingHour),
+            closingMinute: toNumber(closingMinute),
+            averageServiceTime: toNumber(averageServiceTime),
+            counterNumber: toNumber(counterNumber),
             closedDays: parseClosedDays(closedDays),
         },
     });
@@ -174,6 +181,7 @@ const updateServiceCenterService = async (
         closingHour,
         closingMinute,
         averageServiceTime,
+        counterNumber,
         closedDays,
     }
 ) => {
@@ -225,19 +233,29 @@ const updateServiceCenterService = async (
         updateData.logoId = logoId;
     }
     if (openingHour !== undefined) {
-        updateData.openingHour = openingHour;
+        updateData.openingHour = toNumber(openingHour);
     }
     if (openingMinute !== undefined) {
-        updateData.openingMinute = openingMinute;
+        updateData.openingMinute = toNumber(openingMinute);
     }
     if (closingHour !== undefined) {
-        updateData.closingHour = closingHour;
+        updateData.closingHour = toNumber(closingHour);
     }
     if (closingMinute !== undefined) {
-        updateData.closingMinute = closingMinute;
+        updateData.closingMinute = toNumber(closingMinute);
     }
     if (averageServiceTime !== undefined) {
-        updateData.averageServiceTime = averageServiceTime;
+        updateData.averageServiceTime = toNumber(averageServiceTime);
+    }
+    if (counterNumber !== undefined) {
+        const numericCounterNumber = toNumber(counterNumber);
+        if (
+            !Number.isInteger(numericCounterNumber) ||
+            numericCounterNumber < 1
+        ) {
+            throw new ApiError(400, "counterNumber must be a positive integer");
+        }
+        updateData.counterNumber = numericCounterNumber;
     }
     if (closedDays !== undefined) {
         updateData.closedDays = parseClosedDays(closedDays);

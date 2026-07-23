@@ -81,7 +81,6 @@ app.use("/api/v1/service-centers", serviceCenterRoutes);
 app.use("/api/v1/staff-assignment", staffAssignmentRoutes);
 app.use("/api/v1/queue", queueRoutes);
 app.use("/api/v1/notification", notificationRoutes);
-// app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // 404 HANDLER
 // PUT THIS ALWAYS AFTER API ROUTES, OTHERWISE ROUTES WILL BE NEVER FOUND

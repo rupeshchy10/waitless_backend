@@ -60,6 +60,7 @@ model ServiceCenter {
     email         String @unique
     phoneNumber   String
     counterNumber Int    @default(1)
+    closedDays    Int[]  @default([])
 
     logo   String?
     logoId String?
@@ -77,8 +78,6 @@ model ServiceCenter {
     closingMinute Int @default(0)
 
     averageServiceTime Int @default(10)
-
-    closedDays Int[] @default([])
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
