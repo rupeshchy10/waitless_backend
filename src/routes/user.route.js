@@ -41,11 +41,7 @@ router.post(
     validate(validateForgotPassword),
     forgotPassword
 );
-router.post(
-    "/reset-password",
-    validate(validateResetPassword),
-    resetPassword
-);
+router.post("/reset-password", validate(validateResetPassword), resetPassword);
 router.get(
     "/all-lists",
     authMiddleware,
@@ -55,11 +51,11 @@ router.get(
 router.get("/profile", authMiddleware, getOwnProfile);
 router.post("/logout", authMiddleware, logout);
 
-router.put(
+router.patch(
     "/update/:id",
+    authMiddleware,
     upload.single("profileImage"),
     validate(validateUserUpdate),
-    authMiddleware,
     updateUser
 );
 router.delete("/delete/:id", authMiddleware, deleteUser);

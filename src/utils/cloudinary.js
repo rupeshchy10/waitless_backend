@@ -8,7 +8,7 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const uploadOnCloudinary = async (localFilePath, folder) => {
+const uploadOnCloudinary = async (localFilePath, folder = "WaitLess") => {
     if (!localFilePath) return null;
 
     try {
@@ -23,7 +23,7 @@ const uploadOnCloudinary = async (localFilePath, folder) => {
     } finally {
         fs.unlink(localFilePath, (err) => {
             if (err) {
-                console.error("Failed to delete temp upload file:", err.message);
+                console.error("Failed to delete temporary file:", err.message);
             }
         });
     }

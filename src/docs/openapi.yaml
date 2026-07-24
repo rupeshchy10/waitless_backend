@@ -37,9 +37,9 @@ info:
         email: rupevilary1010@gmail.com
 
 servers:
-    - url: http://localhost:8000/api/v1
+    - url: http://localhost:8000/api/v1/
       description: Local Development Server
-    - url: https://your-render-url.onrender.com/api/v1
+    - url: https://waitless-backend-using-pern.onrender.com/api/v1
       description: Production Server
 
 externalDocs:
@@ -262,7 +262,7 @@ paths:
                     $ref: "#/components/responses/Unauthorized"
 
     /user/update/{id}:
-        put:
+        patch:
             tags: [User & Authentication]
             summary: Update user
             description: Updates a user's profile fields. Only the fields provided are updated.
@@ -602,7 +602,7 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
-    /queue/{queueId}/priority:
+    /queue/priority/{queueId}:
         patch:
             tags: [Queue]
             summary: Update queue priority
@@ -976,7 +976,8 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
-        put:
+    /service-centers/update/{id}:
+        patch:
             tags: [Service Center]
             summary: Update service center
             description: "Updates the given fields of a service center. Roles allowed: ADMIN, STAFF."
@@ -1016,6 +1017,7 @@ paths:
                 "409":
                     $ref: "#/components/responses/Conflict"
 
+    /service-centers/delete/{id}:
         delete:
             tags: [Service Center]
             summary: Delete service center
@@ -1266,6 +1268,7 @@ paths:
                 "401":
                     $ref: "#/components/responses/Unauthorized"
 
+    /notification/delete-all:
         delete:
             tags: [Notification]
             summary: Delete all notifications
@@ -1305,6 +1308,7 @@ paths:
                 "404":
                     $ref: "#/components/responses/NotFound"
 
+    /notification/delete/{notificationId}:
         delete:
             tags: [Notification]
             summary: Delete notification
@@ -1532,7 +1536,7 @@ components:
                 profileImage:
                     type: string
                     format: binary
-                    description: Optional profile image file (jpg, png, or webp; max 5MB).
+                    description: Optional profile image file (jpg, png, jepg or webp; max 5MB).
                 role:
                     type: string
                     enum: [USER, STAFF, ADMIN]

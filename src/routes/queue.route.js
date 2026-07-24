@@ -65,7 +65,7 @@ router.get(
     getCheckedInList
 );
 router.patch(
-    "/:queueId/priority",
+    "/priority/:queueId",
     authMiddleware,
     authorizeRoles("ADMIN", "STAFF"),
     updateQueuePriority

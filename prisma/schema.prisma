@@ -87,10 +87,10 @@ model StaffAssignment {
     id String @id @default(uuid())
 
     userId String
-    user   User   @relation(fields: [userId], references: [id])
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     serviceCenterId String
-    serviceCenter   ServiceCenter @relation(fields: [serviceCenterId], references: [id])
+    serviceCenter   ServiceCenter @relation(fields: [serviceCenterId], references: [id], onDelete: Cascade)
 
     @@unique([userId, serviceCenterId])
 }
@@ -103,10 +103,10 @@ model Queue {
     priority QueuePriority @default(NORMAL)
 
     userId String
-    user   User   @relation(fields: [userId], references: [id])
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     serviceCenterId String
-    serviceCenter   ServiceCenter @relation(fields: [serviceCenterId], references: [id])
+    serviceCenter   ServiceCenter @relation(fields: [serviceCenterId], references: [id], onDelete: Cascade)
 
     checkedIn Boolean @default(false)
 
@@ -129,7 +129,7 @@ model Notification {
 
     userId String
 
-    user User @relation(fields: [userId], references: [id])
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     title String
 

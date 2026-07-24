@@ -12,6 +12,7 @@ const validateUserRegister = ({
     password,
     phoneNumber,
     address,
+    role
 }) => {
     if (!fullName?.trim()) {
         throw new ApiError(400, "Full name is required");

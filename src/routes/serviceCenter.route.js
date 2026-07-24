@@ -41,14 +41,14 @@ router.get(
     authorizeRoles("ADMIN", "STAFF"),
     getServiceCenterById
 );
-router.put(
-    "/:id",
+router.patch(
+    "/update/:id",
     upload.single("logo"),
     validate(validateServiceCenterUpdate),
     authMiddleware,
     authorizeRoles("ADMIN", "STAFF"),
     updateServiceCenter
 );
-router.delete("/:id", authMiddleware, deleteServiceCenter);
+router.delete("/delete/:id", authMiddleware, deleteServiceCenter);
 
 export default router;
